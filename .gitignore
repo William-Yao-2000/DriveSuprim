@@ -27,3 +27,19 @@ dataset
 
 # running scripts
 scripts_dev/*
+
+# python
+build/
+vocab_score_local/
+vocab_score_full/
+vocab_score_full_8192/
+vocab_score_local_8192/
+models_local/
+traj_local/
+*.so
+
+dist/
+
+.idea/
+debug/
+# IDE
