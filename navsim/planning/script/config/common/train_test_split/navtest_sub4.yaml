@@ -1,0 +1,4 @@
+defaults:
+  - scene_filter: navtest_sub4
+
+data_split: test
