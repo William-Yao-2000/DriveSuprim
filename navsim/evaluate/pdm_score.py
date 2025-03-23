@@ -1,3 +1,4 @@
+import time
 from typing import List
 
 import numpy as np
@@ -21,6 +22,10 @@ from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator imp
 from navsim.planning.simulation.planner.pdm_planner.utils.pdm_array_representation import ego_states_to_state_array
 from navsim.traffic_agents_policies.abstract_traffic_agents_policy import AbstractTrafficAgentsPolicy
 
+from navsim.planning.simulation.planner.pdm_planner.utils.pdm_enums import (
+    MultiMetricIndex,
+    WeightedMetricIndex,
+)
 
 def transform_trajectory(pred_trajectory: Trajectory, initial_ego_state: EgoState) -> InterpolatedTrajectory:
     """
@@ -201,3 +206,106 @@ def pdm_score_from_interpolated_trajectory(
                 pdm_result.at[0, column] = 1
 
     return pdm_result, simulated_states[pred_idx]
+
+def pdm_score_full_v2(
+    metric_cache: MetricCache,
+    vocab_trajectories: Trajectory,
+    future_sampling: TrajectorySampling,
+    simulator: PDMSimulator,
+    scorer: PDMScorer,
+    traffic_agents_policy: AbstractTrafficAgentsPolicy,
+):
+    start = time.time()
+    transformed_trajectories = [transform_trajectory(Trajectory(pose, TrajectorySampling(
+        time_horizon=4, interval_length=0.1
+    )), metric_cache.ego_state) for pose in vocab_trajectories]
+
+    initial_ego_state = metric_cache.ego_state
+    pdm_states = get_trajectory_as_array(
+        metric_cache.trajectory,
+        future_sampling,
+        initial_ego_state.time_point
+    )[None]
+
+    # pdm, vocab-0, vocab-1, ..., vocab-n
+    all_states = [pdm_states]
+    all_states += [
+        get_trajectory_as_array(
+            transformed,
+            future_sampling,
+            initial_ego_state.time_point
+        )[None] for transformed in transformed_trajectories
+    ]
+    all_states = np.concatenate(all_states, axis=0)
+
+    simulated_states = simulator.simulate_proposals(all_states, initial_ego_state)
+
+    # infer traffic agents policy and update future observation
+    simulated_agent_detections_tracks = traffic_agents_policy.simulate_environment(simulated_states[1], metric_cache)
+
+    assert (
+            len(simulated_agent_detections_tracks) == all_states.shape[1]
+    ), f"""
+                Traffic agents policy returned trajectories of invalid length:
+                Traffic agents trajectories must be of length ego_trajectory_length = {all_states.shape[1]},
+                but got {len(simulated_agent_detections_tracks)}
+            """
+
+    pdm_result, pdms = scorer.score_proposals(
+        simulated_states,
+        metric_cache.observation,
+        metric_cache.centerline,
+        metric_cache.route_lane_ids,
+        metric_cache.drivable_area_map,
+        metric_cache.map_parameters,
+        simulated_agent_detections_tracks,
+        metric_cache.past_human_trajectory,
+        if_return_pdms=True
+    )
+    gt = {
+        'no_at_fault_collisions': scorer._multi_metrics[MultiMetricIndex.NO_COLLISION].astype(np.float16)[1:],
+        'drivable_area_compliance': scorer._multi_metrics[MultiMetricIndex.DRIVABLE_AREA].astype(np.float16)[1:],
+        'driving_direction_compliance': scorer._multi_metrics[MultiMetricIndex.DRIVING_DIRECTION].astype(np.float16)[1:],
+        'traffic_light_compliance': scorer._multi_metrics[MultiMetricIndex.TRAFFIC_LIGHT_COMPLIANCE].astype(np.float16)[1:],
+        'ego_progress': scorer._weighted_metrics[WeightedMetricIndex.PROGRESS].astype(np.float16)[1:],
+        'time_to_collision_within_bound': scorer._weighted_metrics[WeightedMetricIndex.TTC].astype(np.float16)[1:],
+        'lane_keeping': scorer._weighted_metrics[WeightedMetricIndex.LANE_KEEPING].astype(np.float16)[1:],
+        'history_comfort': scorer._weighted_metrics[WeightedMetricIndex.HISTORY_COMFORT].astype(np.float16)[1:],
+        'pdm_score': np.array(pdms).astype(np.float16)[1:]
+    }
+
+    if scorer._config.human_penalty_filter and metric_cache.scene_type == SceneFrameType.ORIGINAL:
+        # human_penalty_filter
+
+        human_trajectory = transform_trajectory(metric_cache.human_trajectory, initial_ego_state)
+
+        human_states = get_trajectory_as_array(human_trajectory, future_sampling, initial_ego_state.time_point)
+
+        human_simulated_states = simulator.simulate_proposals(human_states[None, ...], initial_ego_state)
+
+        human_simulated_agent_detections_tracks = traffic_agents_policy.simulate_environment(
+            human_simulated_states[0], metric_cache
+        )
+
+        human_pdm_result = scorer.score_proposals(
+            human_simulated_states,
+            metric_cache.observation,
+            metric_cache.centerline,
+            metric_cache.route_lane_ids,
+            metric_cache.drivable_area_map,
+            metric_cache.map_parameters,
+            human_simulated_agent_detections_tracks,
+        )[0]
+
+        for column in human_pdm_result.columns:
+            if column in [
+                "multiplicative_metrics_prod",
+                "weighted_metrics",
+                "weighted_metrics_array",
+            ]:
+                continue
+            if human_pdm_result[column].iloc[0] == 0:
+                gt[column] = np.ones_like(gt[column])
+
+    print(time.time() - start)
+    return gt
