@@ -8,9 +8,9 @@ def quoted_presenter(dumper, data):
 
 yaml.add_representer(str, quoted_presenter)
 
-N = 16
+N = 4
 root = '/mnt/f/e2e/navsim2/navsim/planning/script/config/common/train_test_split/scene_filter'
-tgt_yaml = 'navtrain'
+tgt_yaml = 'navtest'
 
 # Load the original YAML file
 with open(f'{root}/{tgt_yaml}.yaml', 'r') as file:
