@@ -1,5 +1,5 @@
 "_convert_": "all"
-"_target_": "navsim.common.dataclasses.SceneFilter"
+"_target_": navsim.common.dataclasses.SceneFilter
 "frame_interval": 1
 "has_route": true
 "log_names":
