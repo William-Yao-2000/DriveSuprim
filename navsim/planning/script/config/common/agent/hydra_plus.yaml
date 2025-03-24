@@ -27,9 +27,9 @@ config:
 #  img_horz_anchors: 32
 #  backbone_type: 'resnet'
 
-  vit_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/da_vitl16.pth
-  intern_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/intern_object365.pth
-  vov_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/dd3d_det_final.pth
+  vit_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/da_vitl16.pth
+  intern_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/intern_object365.pth
+  vov_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/dd3d_det_final.pth
   lr_mult_backbone: 1.0
 
   trajectory_sampling:
