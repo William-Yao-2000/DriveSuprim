@@ -1,0 +1,250 @@
+from typing import Dict
+
+import numpy as np
+import torch
+import torch.nn as nn
+
+from navsim.agents.hydra_plus.hydra_backbone_pe import HydraBackbone
+from navsim.agents.hydra_plus.hydra_config import HydraConfig
+from navsim.agents.transfuser.transfuser_model import AgentHead
+from navsim.agents.utils.attn import MemoryEffTransformer
+from navsim.agents.utils.nerf import nerf_positional_encoding
+
+
+class HydraModel(nn.Module):
+    def __init__(self, config: HydraConfig):
+        super().__init__()
+
+        self._query_splits = [
+            config.num_bounding_boxes,
+        ]
+
+        self._config = config
+        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet', 'eva', 'moe', 'moe_ult32', 'swin']
+        if config.backbone_type == 'eva':
+            raise ValueError(f'{config.backbone_type} not supported')
+        elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or \
+                config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type == 'resnet':
+            self._backbone = HydraBackbone(config)
+
+        img_num = 2 if config.use_back_view else 1
+        self._keyval_embedding = nn.Embedding(
+            config.img_vert_anchors * config.img_horz_anchors * img_num, config.tf_d_model
+        )  # 8x8 feature grid + trajectory
+        self._query_embedding = nn.Embedding(sum(self._query_splits), config.tf_d_model)
+
+        # usually, the BEV features are variable in size.
+        self.downscale_layer = nn.Conv2d(self._backbone.img_feat_c, config.tf_d_model, kernel_size=1)
+        self._status_encoding = nn.Linear((4 + 2 + 2) * config.num_ego_status, config.tf_d_model)
+
+        tf_decoder_layer = nn.TransformerDecoderLayer(
+            d_model=config.tf_d_model,
+            nhead=config.tf_num_head,
+            dim_feedforward=config.tf_d_ffn,
+            dropout=config.tf_dropout,
+            batch_first=True,
+        )
+
+        self._tf_decoder = nn.TransformerDecoder(tf_decoder_layer, config.tf_num_layers)
+        self._agent_head = AgentHead(
+            num_agents=config.num_bounding_boxes,
+            d_ffn=config.tf_d_ffn,
+            d_model=config.tf_d_model,
+        )
+
+        self._trajectory_head = HydraTrajHead(
+            num_poses=config.trajectory_sampling.num_poses,
+            d_ffn=config.tf_d_ffn,
+            d_model=config.tf_d_model,
+            nhead=config.vadv2_head_nhead,
+            nlayers=config.vadv2_head_nlayers,
+            vocab_path=config.vocab_path,
+            config=config
+        )
+
+    def img_feat_blc(self, camera_feature):
+        img_features = self._backbone(camera_feature)
+        img_features = self.downscale_layer(img_features).flatten(-2, -1)
+        img_features = img_features.permute(0, 2, 1)
+        return img_features
+
+    def forward(self, features: Dict[str, torch.Tensor],
+                interpolated_traj=None) -> Dict[str, torch.Tensor]:
+        camera_feature = features["camera_feature"]
+        status_feature: torch.Tensor = features["status_feature"][0]
+        if isinstance(camera_feature, list):
+            camera_feature = camera_feature[-1]
+
+        with torch.no_grad():
+
+            camera_feature_pre: torch.Tensor = features["camera_feature"][-2]
+            status_feature_pre: torch.Tensor = features["status_feature"][1]
+            if self._config.num_ego_status == 1 and status_feature_pre.shape[1] == 32:
+                status_encoding_pre = self._status_encoding(status_feature_pre[:, :8])
+            else:
+                status_encoding_pre = self._status_encoding(status_feature_pre)
+
+            img_features_pre = self._backbone(camera_feature_pre)
+            img_features_pre = self.downscale_layer(img_features_pre)
+
+            img_features_pre = img_features_pre.flatten(-2, -1)  # (B, self.embed_dims, H*W)
+            img_features_pre = img_features_pre.permute(0, 2, 1)  # (B, H*W, self.embed_dims)
+            keyval_pre = img_features_pre
+            keyval_pre += self._keyval_embedding.weight[None, ...]
+            trajectory_pre = self._trajectory_head(keyval_pre, status_encoding_pre, interpolated_traj)
+            trajectory_pre = trajectory_pre['trajectory']
+
+        img_features = self.img_feat_blc(camera_feature)
+        if self._config.use_back_view:
+            img_features_back = self.img_feat_blc(features["camera_feature_back"])
+            img_features = torch.cat([img_features, img_features_back], 1)
+
+        if self._config.num_ego_status == 1 and status_feature.shape[1] == 32:
+            status_encoding = self._status_encoding(status_feature[:, :8])
+        else:
+            status_encoding = self._status_encoding(status_feature)
+
+        keyval = img_features
+        keyval += self._keyval_embedding.weight[None, ...]
+
+        output: Dict[str, torch.Tensor] = {}
+        trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj)
+        output.update(trajectory)
+        output.update({"trajectory_pre": trajectory_pre})
+        return output
+
+
+class HydraTrajHead(nn.Module):
+    def __init__(self, num_poses: int, d_ffn: int, d_model: int, vocab_path: str,
+                 nhead: int, nlayers: int, config: HydraConfig = None
+                 ):
+        super().__init__()
+        self._num_poses = num_poses
+        self.transformer = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(
+                d_model, nhead, d_ffn,
+                dropout=0.0, batch_first=True
+            ), nlayers
+        )
+        self.vocab = nn.Parameter(
+            torch.from_numpy(np.load(vocab_path)),
+            requires_grad=False
+        )
+
+        self.heads = nn.ModuleDict({
+            'no_at_fault_collisions': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'drivable_area_compliance':
+                nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+            'time_to_collision_within_bound': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'ego_progress': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'driving_direction_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'lane_keeping': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'traffic_light_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'imi': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            )
+        })
+
+        self.inference_imi_weight = config.inference_imi_weight
+        self.inference_da_weight = config.inference_da_weight
+        self.normalize_vocab_pos = config.normalize_vocab_pos
+        if self.normalize_vocab_pos:
+            self.encoder = MemoryEffTransformer(
+                d_model=d_model,
+                nhead=nhead,
+                dim_feedforward=d_model * 4,
+                dropout=0.0
+            )
+        self.use_nerf = config.use_nerf
+
+        if self.use_nerf:
+            self.pos_embed = nn.Sequential(
+                nn.Linear(1040, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, d_model),
+            )
+        else:
+            self.pos_embed = nn.Sequential(
+                nn.Linear(num_poses * 3, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, d_model),
+            )
+
+    def forward(self, bev_feature, status_encoding, interpolated_traj=None) -> Dict[str, torch.Tensor]:
+        # vocab: 4096, 40, 3
+        # bev_feature: B, 32, C
+        # embedded_vocab: B, 4096, C
+        vocab = self.vocab.data
+        L, HORIZON, _ = vocab.shape
+        B = bev_feature.shape[0]
+        if self.use_nerf:
+            vocab = torch.cat(
+                [
+                    nerf_positional_encoding(vocab[..., :2]),
+                    torch.cos(vocab[..., -1])[..., None],
+                    torch.sin(vocab[..., -1])[..., None],
+                ], dim=-1
+            )
+
+        if self.normalize_vocab_pos:
+            embedded_vocab = self.pos_embed(vocab.view(L, -1))[None]
+            embedded_vocab = self.encoder(embedded_vocab).repeat(B, 1, 1)
+        else:
+            embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)
+        tr_out = self.transformer(embedded_vocab, bev_feature)
+        dist_status = tr_out + status_encoding.unsqueeze(1)
+        result = {}
+        # selected_indices: B,
+        for k, head in self.heads.items():
+            if k == 'imi':
+                result[k] = head(dist_status).squeeze(-1)
+            else:
+                result[k] = head(dist_status).squeeze(-1).sigmoid()
+
+        scores = (
+                0.05 * result['imi'].softmax(-1).log() +
+                0.5 * result['traffic_light_compliance'].log() +
+                0.5 * result['no_at_fault_collisions'].log() +
+                0.5 * result['drivable_area_compliance'].log() +
+                0.5 * result['driving_direction_compliance'].log() +
+                8.0 * (5 * result['time_to_collision_within_bound'] +
+                       5 * result['ego_progress'] +
+                       5 * result['lane_keeping']).log()
+        )
+        selected_indices = scores.argmax(1)
+        result["trajectory"] = self.vocab.data[selected_indices]
+        result["trajectory_vocab"] = self.vocab.data
+        result["selected_indices"] = selected_indices
+        return result

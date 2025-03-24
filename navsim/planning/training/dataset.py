@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 from tqdm import tqdm
 
+from navsim.common.dataclasses import AgentInput
 from navsim.common.dataloader import SceneLoader
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
 
@@ -140,8 +141,13 @@ class Dataset(torch.utils.data.Dataset):
         target_builders: List[AbstractTargetBuilder],
         cache_path: Optional[str] = None,
         force_cache_computation: bool = False,
+        append_token_to_batch: bool = False,
+        agent_input_only: bool = False
     ):
         super().__init__()
+        self.append_token_to_batch = append_token_to_batch
+        self.agent_input_only = agent_input_only
+
         self._scene_loader = scene_loader
         self._feature_builders = feature_builders
         self._target_builders = target_builders
@@ -260,7 +266,7 @@ class Dataset(torch.utils.data.Dataset):
         """
         return len(self._scene_loader)
 
-    def __getitem__(self, idx: int) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    def __getitem__(self, idx: int) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], str]:
         """
         Get features or targets either from cache or computed on-the-fly.
         :param idx: index of sample to load.
@@ -270,6 +276,17 @@ class Dataset(torch.utils.data.Dataset):
         token = self._scene_loader.tokens[idx]
         features: Dict[str, torch.Tensor] = {}
         targets: Dict[str, torch.Tensor] = {}
+
+        if self.agent_input_only:
+            agent_input = AgentInput.from_scene_dict_list(
+                self._scene_loader.scene_frames_dicts[token],
+                self._scene_loader._sensor_blobs_path,
+                num_history_frames=self._scene_loader._scene_filter.num_history_frames,
+                sensor_config=self._scene_loader._sensor_config,
+            )
+            for builder in self._feature_builders:
+                features.update(builder.compute_features(agent_input))
+            return features, {'dummy': torch.zeros(1)}, token
 
         if self._cache_path is not None:
             assert (
@@ -285,4 +302,4 @@ class Dataset(torch.utils.data.Dataset):
             for builder in self._target_builders:
                 targets.update(builder.compute_targets(scene))
 
-        return (features, targets)
+        return (features, targets, token)

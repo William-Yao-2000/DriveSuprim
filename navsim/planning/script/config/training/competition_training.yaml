@@ -10,7 +10,7 @@ hydra:
 defaults:
   - default_common
   - default_evaluation
-  - default_train_val_test_log_split
+  - competition_train_val_test_log_split
   - agent: ego_status_mlp_agent
   - _self_
 
