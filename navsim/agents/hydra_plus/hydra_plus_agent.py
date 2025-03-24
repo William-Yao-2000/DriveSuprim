@@ -8,7 +8,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
 from navsim.agents.hydra_plus.hydra_features import HydraFeatureBuilder, HydraTargetBuilder
-from navsim.agents.hydra_plus.hydra_model_expansion import HydraModel
+from navsim.agents.hydra_plus.hydra_model import HydraModel
 from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import (
     AbstractFeatureBuilder,

@@ -3,16 +3,12 @@ Implements the TransFuser vision backbone.
 """
 
 import timm
-import torch
-import torch.nn.functional as F
 from torch import nn
-from torch.utils.checkpoint import checkpoint
 
 from navsim.agents.backbones.internimage import InternImage
 from navsim.agents.backbones.swin import SwinTransformerBEVFT
 from navsim.agents.backbones.vov import VoVNet
 from navsim.agents.hydra_plus.hydra_config import HydraConfig
-from navsim.agents.transfuser.transfuser_backbone import GPT
 from navsim.agents.utils.vit import DAViT
 
 
@@ -30,7 +26,7 @@ class HydraBackbone(nn.Module):
             self.image_encoder = InternImage(init_cfg=dict(type='Pretrained',
                                                            checkpoint=config.intern_ckpt
                                                            ),
-                                                           frozen_stages=2)
+                                             frozen_stages=2)
             # scale_4_c = 2560
             vit_channels = 2560
             self.image_encoder.init_weights()
@@ -53,17 +49,17 @@ class HydraBackbone(nn.Module):
             self.image_encoder = SwinTransformerBEVFT(
                 with_cp=True,
                 convert_weights=False,
-                depths=[2,2,18,2],
+                depths=[2, 2, 18, 2],
                 drop_path_rate=0.35,
                 embed_dims=192,
                 init_cfg=dict(
                     checkpoint=config.swin_ckpt,
                     type='Pretrained'
                 ),
-                num_heads=[6,12,24,48],
+                num_heads=[6, 12, 24, 48],
                 out_indices=[3],
                 patch_norm=True,
-                window_size=[16,16,16,16],
+                window_size=[16, 16, 16, 16],
                 use_abs_pos_embed=True,
                 return_stereo_feat=False,
                 output_missing_index_as_none=False

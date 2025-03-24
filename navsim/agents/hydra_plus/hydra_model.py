@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from navsim.agents.hydra_plus.hydra_backbone_pe import HydraBackbone
+from navsim.agents.hydra_plus.hydra_backbone import HydraBackbone
 from navsim.agents.hydra_plus.hydra_config import HydraConfig
 from navsim.agents.transfuser.transfuser_model import AgentHead
 from navsim.agents.utils.attn import MemoryEffTransformer
