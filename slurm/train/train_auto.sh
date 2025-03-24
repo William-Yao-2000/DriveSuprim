@@ -3,7 +3,7 @@
 agent=$1
 dir=$1
 
-bs=32
+bs=16
 lr=0.0002
 epoch=20
 config="competition_training"
