@@ -148,6 +148,7 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[D
         except Exception as e:
             logger.warning(f"----------- Agent failed for token {token}:")
             traceback.print_exc()
+            return None
 
         pdm_results.append(score_row)
     return pdm_results
