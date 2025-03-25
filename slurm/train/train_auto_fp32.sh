@@ -7,7 +7,7 @@ dir=$2
 # 3nodes, bs=22
 bs=$3
 lr=0.0002
-epoch=20
+max_epochs=20
 
 config="competition_training"
 ckpt_dir="${NAVSIM_EXP_ROOT}/${dir}"
@@ -29,7 +29,7 @@ run_train_from_scratch() {
             train_test_split=navtrain \
             dataloader.params.batch_size=$bs \
             ~trainer.params.strategy \
-            trainer.params.max_epochs=$epoch \
+            trainer.params.max_epochs=${max_epochs} \
             trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
@@ -64,7 +64,7 @@ resume_training() {
             train_test_split=navtrain \
             dataloader.params.batch_size=$bs \
             ~trainer.params.strategy \
-            trainer.params.max_epochs=$epoch \
+            trainer.params.max_epochs=${max_epochs} \
             trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
