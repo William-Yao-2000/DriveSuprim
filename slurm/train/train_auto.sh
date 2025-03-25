@@ -1,17 +1,17 @@
 #!/bin/bash
 
 agent=$1
-dir=$1
+dir=$2
 
-bs=16
+bs=32
 lr=0.0002
 epoch=20
 config="competition_training"
 ckpt_dir="${NAVSIM_EXP_ROOT}/${dir}"
 
-export NCCL_DEBUG=INFO
+#export NCCL_DEBUG=INFO
 #export NCCL_DEBUG_SUBSYS=ALL
-export TORCH_DISTRIBUTED_DEBUG=INFO
+#export TORCH_DISTRIBUTED_DEBUG=INFO
 
 # Function to execute training from scratch
 run_train_from_scratch() {
