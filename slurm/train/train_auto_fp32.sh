@@ -30,6 +30,7 @@ run_train_from_scratch() {
             dataloader.params.batch_size=$bs \
             ~trainer.params.strategy \
             trainer.params.max_epochs=$epoch \
+            trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
             cache_path=null
@@ -67,6 +68,7 @@ resume_training() {
             dataloader.params.batch_size=$bs \
             ~trainer.params.strategy \
             trainer.params.max_epochs=$epoch \
+            trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
             cache_path=null
