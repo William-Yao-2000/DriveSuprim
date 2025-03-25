@@ -48,13 +48,6 @@ run_train_from_scratch() {
 # Function to resume training from latest checkpoint
 resume_training() {
     local latest_epoch=$1
-    cd $ckpt_dir
-    for file in epoch=*-step=*.ckpt; do
-      epoch=$(echo $file | sed -n 's/.*epoch=\([0-9][0-9]\).*/\1/p')
-      new_filename="epoch${epoch}.ckpt"
-      mv "$file" "$new_filename"
-    done
-    cd $NAVSIM_NAVSIM_DEVKIT_ROOT
 
     padded_ckpt_epoch=$(printf "%02d" $latest_epoch)
     resume="epoch${padded_ckpt_epoch}.ckpt"
@@ -93,8 +86,17 @@ if [ ! -d "$ckpt_dir" ]; then
     run_train_from_scratch
 else
     echo "Checking for checkpoints in $ckpt_dir..."
+    cd $ckpt_dir
+    for file in epoch=*-step=*.ckpt; do
+      epoch=$(echo $file | sed -n 's/.*epoch=\([0-9][0-9]\).*/\1/p')
+      new_filename="epoch${epoch}.ckpt"
+      mv "$file" "$new_filename"
+    done
+    cd $NAVSIM_NAVSIM_DEVKIT_ROOT
+
+
     shopt -s nullglob
-    ckpt_files=("$ckpt_dir"/epoch=*-step=*.ckpt)
+    ckpt_files=("$ckpt_dir"/epoch*.ckpt)
     shopt -u nullglob
 
     if [ ${#ckpt_files[@]} -eq 0 ]; then
@@ -105,9 +107,10 @@ else
         latest_epoch=-1
         for file in "${ckpt_files[@]}"; do
             base_file=$(basename "$file")
-            epoch_str=${base_file#epoch=}
-            epoch_str=${epoch_str%%-step=*}
-            epoch_num=$((10#$epoch_str))  # Force decimal interpretation
+            # Extract epoch number from filename format: epochXX.ckpt
+            epoch_str=${base_file#epoch}   # Remove 'epoch' prefix
+            epoch_str=${epoch_str%.ckpt}    # Remove '.ckpt' suffix
+            epoch_num=$((10#$epoch_str))    # Convert to base-10 number
 
             if (( epoch_num > latest_epoch )); then
                 latest_epoch=$epoch_num
