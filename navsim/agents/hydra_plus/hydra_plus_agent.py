@@ -76,21 +76,20 @@ def hydra_kd_imi_agent_loss(
     sampled_timepoints = [5 * k - 1 for k in range(1, 9)]
     B = target_traj.shape[0]
 
-    # l2_distance = -((vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / config.sigma
-    # l2_distance = l2_distance.sum((-2, -1))
-    # imi_loss = F.cross_entropy(imi, l2_distance.softmax(1))
-
-    # 16 mixed training
-    l2_distance = (vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2
+    # soft label
+    l2_distance = -((vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / config.sigma
     l2_distance = l2_distance.sum((-2, -1))
-    min_idx = l2_distance.argmin(1)
-    imi_gt = torch.zeros_like(imi)
-    imi_gt = imi_gt.scatter_(1, min_idx.unsqueeze(1), 1)
+    imi_loss = F.cross_entropy(imi, l2_distance.softmax(1))
 
-    imi_loss = F.cross_entropy(imi, imi_gt)
+    # one-hot
+    # l2_distance = (vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2
+    # l2_distance = l2_distance.sum((-2, -1))
+    # min_idx = l2_distance.argmin(1)
+    # imi_gt = torch.zeros_like(imi)
+    # imi_gt = imi_gt.scatter_(1, min_idx.unsqueeze(1), 1)
+    # imi_loss = F.cross_entropy(imi, imi_gt)
 
     imi_loss_final = config.trajectory_imi_weight * imi_loss
-
     noc_loss_final = config.trajectory_pdm_weight['no_at_fault_collisions'] * noc_loss
     da_loss_final = config.trajectory_pdm_weight['drivable_area_compliance'] * da_loss
     ttc_loss_final = config.trajectory_pdm_weight['time_to_collision_within_bound'] * ttc_loss
