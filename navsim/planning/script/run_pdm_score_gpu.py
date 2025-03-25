@@ -1,5 +1,6 @@
 import logging
 import os
+import pickle
 import traceback
 import uuid
 from dataclasses import fields
@@ -8,15 +9,16 @@ from pathlib import Path
 from typing import Dict, List, Union
 
 import hydra
-import numpy as np
 import pandas as pd
+import pytorch_lightning as pl
+import torch.distributed as dist
 from hydra.utils import instantiate
 from nuplan.common.actor_state.state_representation import StateSE2
 from nuplan.common.geometry.convert import relative_to_absolute_poses
 from nuplan.planning.script.builders.logging_builder import build_logger
-from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
 from nuplan.planning.utils.multithreading.worker_utils import worker_map
 from omegaconf import DictConfig
+from torch.utils.data import DataLoader
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.common.dataclasses import PDMResults, SensorConfig
@@ -24,10 +26,13 @@ from navsim.common.dataloader import MetricCacheLoader, SceneFilter, SceneLoader
 from navsim.common.enums import SceneFrameType
 from navsim.evaluate.pdm_score import pdm_score
 from navsim.planning.script.builders.worker_pool_builder import build_worker
-from navsim.planning.simulation.planner.pdm_planner.scoring.pdm_comfort_metrics import ego_is_two_frame_extended_comfort
+from navsim.planning.script.run_pdm_score import calculate_two_frame_extended_comfort, compute_final_scores, \
+    infer_two_stage_mapping, validate_two_stage_mapping, calculate_pseudo_closed_loop_weights, \
+    calculate_individual_mapping_scores
 from navsim.planning.simulation.planner.pdm_planner.scoring.pdm_scorer import PDMScorer
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
-from navsim.planning.simulation.planner.pdm_planner.utils.pdm_enums import WeightedMetricIndex
+from navsim.planning.training.agent_lightning_module import AgentLightningModule
+from navsim.planning.training.dataset import Dataset
 from navsim.traffic_agents_policies.abstract_traffic_agents_policy import AbstractTrafficAgentsPolicy
 
 logger = logging.getLogger(__name__)
@@ -38,7 +43,7 @@ CONFIG_NAME = "default_run_pdm_score"
 
 # TODO gpu inference
 
-def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[pd.DataFrame]:
+def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[pd.DataFrame]:
     """
     Helper function to run PDMS evaluation in.
     :param args: input arguments
@@ -50,15 +55,13 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[p
     log_names = [a["log_file"] for a in args]
     tokens = [t for a in args for t in a["tokens"]]
     cfg: DictConfig = args[0]["cfg"]
+    model_trajectory = args[0]['model_trajectory']
 
     simulator: PDMSimulator = instantiate(cfg.simulator)
     scorer: PDMScorer = instantiate(cfg.scorer)
     assert (
-        simulator.proposal_sampling == scorer.proposal_sampling
+            simulator.proposal_sampling == scorer.proposal_sampling
     ), "Simulator and scorer proposal sampling has to be identical"
-    agent: AbstractAgent = instantiate(cfg.agent)
-    agent.initialize()
-
     traffic_agents_policy: AbstractTrafficAgentsPolicy = instantiate(
         cfg.traffic_agents_policy, simulator.proposal_sampling
     )
@@ -72,24 +75,18 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[p
         data_path=Path(cfg.navsim_log_path),
         synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
         scene_filter=scene_filter,
-        sensor_config=agent.get_sensor_config(),
     )
 
     tokens_to_evaluate = list(set(scene_loader.tokens) & set(metric_cache_loader.tokens))
     pdm_results: List[pd.DataFrame] = []
+
     for idx, (token) in enumerate(tokens_to_evaluate):
         logger.info(
             f"Processing scenario {idx + 1} / {len(tokens_to_evaluate)} in thread_id={thread_id}, node_id={node_id}"
         )
         try:
             metric_cache = metric_cache_loader.get_from_token(token)
-            agent_input = scene_loader.get_agent_input_from_token(token)
-            if agent.requires_scene:
-                scene = scene_loader.get_scene_from_token(token)
-                trajectory = agent.compute_trajectory(agent_input, scene)
-            else:
-                trajectory = agent.compute_trajectory(agent_input)
-
+            trajectory = model_trajectory[token]['trajectory']
             score_row, ego_simulated_states = pdm_score(
                 metric_cache=metric_cache,
                 model_trajectory=trajectory,
@@ -125,268 +122,6 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[p
     return pdm_results
 
 
-def infer_two_stage_mapping(score_df: pd.DataFrame, first_stage_duration: float) -> pd.DataFrame:
-    initial_frames = score_df[(score_df["valid"]) & (score_df["frame_type"] == SceneFrameType.ORIGINAL)]
-
-    two_stage_mapping = {}
-    for _, row in initial_frames.iterrows():
-        # Filter tokens in the same log starting at least T seconds later
-        earliest_second_stage_start_time = row["start_time"] + first_stage_duration - 0.05
-        latest_second_stage_start_time = row["start_time"] + first_stage_duration + 0.05
-        second_stage_tokens: pd.DataFrame = score_df[
-            (score_df["log_name"] == row["log_name"])
-            & (score_df["start_time"] <= latest_second_stage_start_time)
-            & (score_df["start_time"] >= earliest_second_stage_start_time)
-            & (score_df["valid"])
-            & (score_df["frame_type"] == SceneFrameType.SYNTHETIC)
-        ]["token"].to_list()
-
-        two_stage_mapping[row["token"]] = second_stage_tokens
-    return two_stage_mapping
-
-
-def validate_two_stage_mapping(
-    score_df: pd.DataFrame,
-    two_stage_mapping: Dict[str, List[str]],
-    validate_start_times: bool = True,
-) -> None:
-    # make sure all tokens are unique
-    all_tokens = [token for tokens in two_stage_mapping.values() for token in tokens] + list(two_stage_mapping.keys())
-    assert len(all_tokens) == len(set(all_tokens)), "Tokens in the two stage mapping are not unique."
-
-    # make sure all tokens are in the score dataframe
-    assert set(all_tokens) == set(score_df["token"]), (
-        f"Tokens in the two stage aggregation mapping and the results are not the same. "
-        f"Missing tokens in the mapping: {set(all_tokens) - set(score_df['token'])}."
-        f"Missing tokens in the results: {set(score_df['token']) - set(all_tokens)}."
-    )
-
-    # make sure subsequent tokens belong to the same log
-    # make sure first stage and second stage tokens are 4s apart
-    for first_stage_token, second_stage_tokens in two_stage_mapping.items():
-        first_stage_log_name = score_df[score_df["token"] == first_stage_token].iloc[0]["log_name"]
-        if validate_start_times:
-            first_stage_start_time = score_df[score_df["token"] == first_stage_token].iloc[0]["start_time"]
-        else:
-            first_stage_start_time = 0.0
-        for second_stage_token in second_stage_tokens:
-            second_stage_log_name = score_df[score_df["token"] == second_stage_token].iloc[0]["log_name"]
-            if validate_start_times:
-                second_stage_start_time = score_df[score_df["token"] == second_stage_token].iloc[0]["start_time"]
-            else:
-                second_stage_start_time = 4.0
-            assert first_stage_log_name == second_stage_log_name, (
-                f"Tokens {first_stage_token} and {second_stage_token} belong to different logs."
-                f"First stage log: {first_stage_log_name}, second stage log: {second_stage_log_name}."
-            )
-            assert np.abs(second_stage_start_time - first_stage_start_time - 4.0) < 0.05, (
-                f"Tokens {first_stage_token} and {second_stage_token} are not 4s apart."
-                f"First stage start time: {first_stage_start_time}, second stage start time: {second_stage_start_time}."
-            )
-
-    # make sure the frame_type of all first_stage tokens is ORIGINAL and all second_stage tokens is SYNTHETIC
-    first_stage_tokens = list(two_stage_mapping.keys())
-    second_stage_tokens = [token for tokens in two_stage_mapping.values() for token in tokens]
-    first_stage_types = score_df.loc[score_df["token"].isin(first_stage_tokens), "frame_type"]
-    second_stage_types = score_df.loc[score_df["token"].isin(second_stage_tokens), "frame_type"]
-    assert (first_stage_types == SceneFrameType.ORIGINAL).all(), "Some first-stage tokens are not of type ORIGINAL."
-    assert (second_stage_types == SceneFrameType.SYNTHETIC).all(), "Some second-stage tokens are not of type SYNTHETIC."
-
-
-def calculate_pseudo_closed_loop_weights(
-    score_df: pd.DataFrame, two_stage_mapping: Dict[str, List[str]]
-) -> pd.DataFrame:
-    """
-    Calculate two stage scores for each scenario.
-    :param score_rows: List of dataframes containing scores for each scenario.
-    :param first_stage_duration: Duration of the first stage in seconds.
-    """
-    pd.options.mode.copy_on_write = True
-
-    def _calc_distance(x1, y1, x2, y2):
-        return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-
-    first_stage_tokens = list(two_stage_mapping.keys())
-
-    weights = []
-    for first_stage_token in first_stage_tokens:
-        first_stage_row = score_df[score_df["token"] == first_stage_token].iloc[0]
-        second_stage_tokens = two_stage_mapping[first_stage_token]
-        # set weight of first stage to one
-        weights.append(pd.DataFrame([{"token": first_stage_token, "weight": 1.0}]))
-        # compute weights for second stage
-        second_stage_scores: pd.DataFrame = score_df[(score_df["token"].isin(second_stage_tokens))]
-        second_stage_scores["distance"] = second_stage_scores.apply(
-            lambda x: _calc_distance(
-                first_stage_row["endpoint_x"],
-                first_stage_row["endpoint_y"],
-                x["start_point_x"],
-                x["start_point_y"],
-            ),
-            axis=1,
-        )
-        second_stage_scores["weight"] = second_stage_scores["distance"].apply(lambda x: np.exp(-x))
-        second_stage_scores["weight"] = second_stage_scores["weight"] / second_stage_scores["weight"].sum()
-
-        weights.append(second_stage_scores[["token", "weight"]])
-
-    weights = pd.concat(weights)
-    return weights
-
-
-def calculate_two_frame_extended_comfort(score_df: pd.DataFrame, proposal_sampling: TrajectorySampling) -> pd.DataFrame:
-    """
-    Calculates two-frame extended comfort by comparing only the overlapping parts of consecutive original frames.
-    Handles varying observation intervals.
-
-    :param score_df: DataFrame containing scores and states of frames.
-    :param proposal_sampling: Sampling parameters for trajectory.
-    :return: DataFrame containing two-frame extended comfort scores.
-    """
-    results = []
-    interval_length = proposal_sampling.interval_length  # Default: 0.1s
-
-    grouped_logs = score_df[score_df["frame_type"] == SceneFrameType.ORIGINAL].groupby("log_name")
-
-    for log_name, group_df in grouped_logs:
-        group_df = group_df.sort_values(by="start_time").reset_index(drop=True)
-
-        for idx in range(len(group_df) - 1):  # Iterate over consecutive frames
-            current_row = group_df.iloc[idx]
-            next_row = group_df.iloc[idx + 1]
-
-            observation_interval = next_row["start_time"] - current_row["start_time"]
-
-            if abs(observation_interval) > 0.55:
-                two_frame_comfort = np.nan
-                next_token = np.nan
-            else:
-                overlap_start = int(observation_interval / interval_length)
-
-                current_states = current_row["ego_simulated_states"]
-                next_states = next_row["ego_simulated_states"]
-
-                # Ensure they have the same shape
-                assert current_states.shape == next_states.shape, "Trajectories must be of equal length"
-
-                # Extract only the overlapping part
-                current_states_overlap = current_states[overlap_start:]
-                next_states_overlap = next_states[:-overlap_start]
-
-                # Define corresponding time points for overlap
-                n_overlap = current_states_overlap.shape[0]  # Compute the actual number of overlapping steps
-                time_point_s = np.arange(n_overlap) * interval_length  # Generate aligned time steps
-
-                # Compute two-frame extended comfort
-                two_frame_comfort = ego_is_two_frame_extended_comfort(
-                    current_states_overlap[None, :],
-                    next_states_overlap[None, :],
-                    time_point_s,
-                )[0].astype(np.float64)
-
-                next_token = next_row["token"]
-
-            results.append(
-                {
-                    "current_token": current_row["token"],
-                    "next_token": next_token,
-                    "two_frame_extended_comfort": two_frame_comfort,
-                }
-            )
-
-    return pd.DataFrame(results)
-
-
-def compute_final_scores(pdm_score_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute final scores for each row in pdm_score_df after updating
-    the weighted metrics with two-frame extended comfort.
-
-    If 'two_frame_extended_comfort' is NaN for a row, the corresponding
-    metric and its weight are set to zero, effectively ignoring it
-    during normalization.
-
-    :param pdm_score_df: DataFrame containing PDM scores and metrics.
-    :return: A new DataFrame with the computed final scores.
-    """
-    df = pdm_score_df.copy()
-
-    two_frame_scores = df["two_frame_extended_comfort"].to_numpy()  # shape: (N, )
-    weighted_metrics = np.stack(df["weighted_metrics"].to_numpy())  # shape: (N, M)
-    weighted_metrics_array = np.stack(df["weighted_metrics_array"].to_numpy())  # shape: (N, M)
-
-    mask = np.isnan(two_frame_scores)
-    two_frame_idx = WeightedMetricIndex.TWO_FRAME_EXTENDED_COMFORT
-
-    weighted_metrics[mask, two_frame_idx] = 0.0
-    weighted_metrics_array[mask, two_frame_idx] = 0.0
-
-    non_mask = ~mask
-    weighted_metrics[non_mask, two_frame_idx] = two_frame_scores[non_mask]
-
-    weighted_sum = (weighted_metrics * weighted_metrics_array).sum(axis=1)
-    total_weight = weighted_metrics_array.sum(axis=1)
-    total_weight[total_weight == 0.0] = np.nan
-    weighted_metric_scores = weighted_sum / total_weight
-
-    df["score"] = df["multiplicative_metrics_prod"].to_numpy() * weighted_metric_scores
-    df.drop(
-        columns=["weighted_metrics", "weighted_metrics_array", "multiplicative_metrics_prod"],
-        inplace=True,
-    )
-
-    return df
-
-
-def calculate_weighted_average_score(df: pd.DataFrame) -> pd.Series:
-    """
-    Calculate the weighted average score of a dataframe.
-    :param df: Dataframe containing scores.
-    """
-
-    if df.empty:
-        score_cols = [c for c in df.columns if c not in {"weight", "token"}]
-        return pd.Series([np.nan] * len(score_cols), index=score_cols)
-
-    weights = df["weight"]
-    weighted_scores = df[[c for c in df.columns if c not in {"weight", "token"}]].mul(weights, axis=0)
-
-    weighted_scores_row = weighted_scores.sum(skipna=False)
-    return weighted_scores_row
-
-
-def calculate_individual_mapping_scores(df: pd.DataFrame, two_stage_mapping: Dict[str, List[str]]) -> pd.DataFrame:
-    """
-    Compute the weighted average score for each first_stage_token
-    in the two_stage_mapping. The function returns a new DataFrame
-    containing the weighted average for each mapping.
-
-    :param df: A DataFrame that includes columns like 'token', 'weight', 'score', etc.
-    :param two_stage_mapping: A dictionary where each key is a first-stage token (str),
-        and each value is a list of second-stage tokens.
-    :return: A DataFrame with one row per first-stage token, containing the
-        weighted average scores for that token and its second-stage tokens.
-    """
-    # This list will hold the results (one row per mapping).
-    rows_for_each_mapping = []
-
-    for first_stage_token, second_stage_tokens in two_stage_mapping.items():
-
-        stage1_df = df[df["token"] == first_stage_token]
-        stage1_avg_series = calculate_weighted_average_score(stage1_df)
-        stage2_df = df[df["token"].isin(second_stage_tokens)]
-        stage2_avg_series = calculate_weighted_average_score(stage2_df)
-
-        # Combine the two stages
-        subset_average = pd.concat([stage1_avg_series, stage2_avg_series], axis=1).mean(axis=1, skipna=True)
-        rows_for_each_mapping.append(subset_average)
-
-    mapping_scores_df = pd.DataFrame(rows_for_each_mapping)
-    mapping_scroes_row = mapping_scores_df.mean(skipna=True)
-
-    return mapping_scroes_row
-
-
 @hydra.main(config_path=CONFIG_PATH, config_name=CONFIG_NAME, version_base=None)
 def main(cfg: DictConfig) -> None:
     """
@@ -397,6 +132,30 @@ def main(cfg: DictConfig) -> None:
     build_logger(cfg)
     worker = build_worker(cfg)
 
+    # GPU INFERENCE
+    # gpu inference
+    agent: AbstractAgent = instantiate(cfg.agent)
+    agent.initialize()
+    # Extract scenes based on scene-loader to know which tokens to distribute across workers
+    scene_filter = instantiate(cfg.train_test_split.scene_filter)
+    scene_loader_inference = SceneLoader(
+        sensor_blobs_path=Path(cfg.sensor_blobs_path),
+        data_path=Path(cfg.navsim_log_path),
+        navsim_blobs_path=Path(cfg.navsim_blobs_path),
+        scene_filter=scene_filter,
+        synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
+        sensor_config=agent.get_sensor_config(),
+    )
+    dataset = Dataset(
+        scene_loader=scene_loader_inference,
+        feature_builders=agent.get_feature_builders(),
+        target_builders=agent.get_target_builders(),
+        cache_path=None,
+        force_cache_computation=False,
+        append_token_to_batch=True
+    )
+    dataloader = DataLoader(dataset, **cfg.dataloader.params, shuffle=False)
+
     # Extract scenes based on scene-loader to know which tokens to distribute across workers
     # TODO: infer the tokens per log from metadata, to not have to load metric cache and scenes here
     scene_loader = SceneLoader(
@@ -404,7 +163,7 @@ def main(cfg: DictConfig) -> None:
         navsim_blobs_path=None,
         data_path=Path(cfg.navsim_log_path),
         synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
-        scene_filter=instantiate(cfg.train_test_split.scene_filter),
+        scene_filter=scene_filter,
         sensor_config=SensorConfig.build_no_sensors(),
     )
     metric_cache_loader = MetricCacheLoader(Path(cfg.metric_cache_path))
@@ -417,15 +176,48 @@ def main(cfg: DictConfig) -> None:
     if num_unused_metric_cache_tokens > 0:
         logger.warning(f"Unused metric cache for {num_unused_metric_cache_tokens} tokens. Skipping these tokens.")
     logger.info(f"Starting pdm scoring of {len(tokens_to_evaluate)} scenarios...")
+
+    assert len(dataset) == len(tokens_to_evaluate), f'dataloader: {len(dataset)}, tokens: {len(tokens_to_evaluate)}'
+
+    trainer = pl.Trainer(**cfg.trainer.params, callbacks=agent.get_training_callbacks())
+    predictions = trainer.predict(
+        AgentLightningModule(
+            agent=agent,
+        ),
+        dataloader,
+        return_predictions=True
+    )
+
+    dist.barrier()
+    all_predictions = [None for _ in range(dist.get_world_size())]
+
+    if dist.is_initialized():
+        dist.all_gather_object(all_predictions, predictions)
+    else:
+        all_predictions.append(predictions)
+
+    if dist.get_rank() != 0:
+        return None
+
+    merged_predictions = {}
+    for proc_prediction in all_predictions:
+        for d in proc_prediction:
+            merged_predictions.update(d)
+
+    agent_ckpt_path = Path(cfg.agent.checkpoint_path).parent.absolute().__str__()
+    ckpt_name = Path(cfg.agent.checkpoint_path).name.split('.')[0]
+    pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{ckpt_name}.pkl', 'wb'))
+
     data_points = [
         {
             "cfg": cfg,
             "log_file": log_file,
             "tokens": tokens_list,
+            "model_trajectory": merged_predictions
         }
         for log_file, tokens_list in scene_loader.get_tokens_list_per_log().items()
     ]
-    score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score, data_points)
+    score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score_wo_inference, data_points)
 
     pdm_score_df = pd.concat(score_rows)
 
@@ -479,8 +271,9 @@ def main(cfg: DictConfig) -> None:
         c
         for c in pdm_score_df.columns
         if (
-            (any(score.name in c for score in fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score")
-            and c != "pdm_score"
+                (any(score.name in c for score in
+                     fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score")
+                and c != "pdm_score"
         )
     ]
 

@@ -60,14 +60,14 @@ def hydra_kd_imi_agent_loss(
     imi = predictions['imi']
     dtype = imi.dtype
     # 2 cls
-    da_loss = F.binary_cross_entropy(drivable_area_compliance, vocab_pdm_score['drivable_area_compliance'].to(dtype))
-    ttc_loss = F.binary_cross_entropy(time_to_collision_within_bound, vocab_pdm_score['time_to_collision_within_bound'].to(dtype))
-    noc_loss = F.binary_cross_entropy(no_at_fault_collisions, three_to_two_classes(vocab_pdm_score['no_at_fault_collisions'].to(dtype)))
-    progress_loss = F.binary_cross_entropy(ego_progress, vocab_pdm_score['ego_progress'].to(dtype))
+    da_loss = F.binary_cross_entropy_with_logits(drivable_area_compliance, vocab_pdm_score['drivable_area_compliance'].to(dtype))
+    ttc_loss = F.binary_cross_entropy_with_logits(time_to_collision_within_bound, vocab_pdm_score['time_to_collision_within_bound'].to(dtype))
+    noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, three_to_two_classes(vocab_pdm_score['no_at_fault_collisions'].to(dtype)))
+    progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(dtype))
     # expansion
-    ddc_loss = F.binary_cross_entropy(driving_direction_compliance, three_to_two_classes(vocab_pdm_score['driving_direction_compliance'].to(dtype)))
-    lk_loss = F.binary_cross_entropy(lane_keeping, vocab_pdm_score['lane_keeping'].to(dtype))
-    tl_loss = F.binary_cross_entropy(traffic_light_compliance, vocab_pdm_score['traffic_light_compliance'].to(dtype))
+    ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, three_to_two_classes(vocab_pdm_score['driving_direction_compliance'].to(dtype)))
+    lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(dtype))
+    tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance, vocab_pdm_score['traffic_light_compliance'].to(dtype))
 
     vocab = predictions["trajectory_vocab"]
     # B, 8 (4 secs, 0.5Hz), 3

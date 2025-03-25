@@ -228,21 +228,32 @@ class HydraTrajHead(nn.Module):
         result = {}
         # selected_indices: B,
         for k, head in self.heads.items():
-            if k == 'imi':
-                result[k] = head(dist_status).squeeze(-1)
-            else:
-                result[k] = head(dist_status).squeeze(-1).sigmoid()
-
+            result[k] = head(dist_status).squeeze(-1)
+            # if k == 'imi':
+            #     result[k] = head(dist_status).squeeze(-1)
+            # else:
+            #     result[k] = head(dist_status).squeeze(-1).sigmoid()
         scores = (
                 0.05 * result['imi'].softmax(-1).log() +
-                0.5 * result['traffic_light_compliance'].log() +
-                0.5 * result['no_at_fault_collisions'].log() +
-                0.5 * result['drivable_area_compliance'].log() +
-                0.5 * result['driving_direction_compliance'].log() +
-                8.0 * (5 * result['time_to_collision_within_bound'] +
-                       5 * result['ego_progress'] +
-                       5 * result['lane_keeping']).log()
+                0.5 * result['traffic_light_compliance'].sigmoid().log() +
+                0.5 * result['no_at_fault_collisions'].sigmoid().log() +
+                0.5 * result['drivable_area_compliance'].sigmoid().log() +
+                0.5 * result['driving_direction_compliance'].sigmoid().log() +
+                8.0 * (5 * result['time_to_collision_within_bound'].sigmoid() +
+                       5 * result['ego_progress'].sigmoid() +
+                       5 * result['lane_keeping'].sigmoid()).log()
         )
+
+        # scores = (
+        #         0.05 * result['imi'].softmax(-1).log() +
+        #         0.5 * result['traffic_light_compliance'].log() +
+        #         0.5 * result['no_at_fault_collisions'].log() +
+        #         0.5 * result['drivable_area_compliance'].log() +
+        #         0.5 * result['driving_direction_compliance'].log() +
+        #         8.0 * (5 * result['time_to_collision_within_bound'] +
+        #                5 * result['ego_progress'] +
+        #                5 * result['lane_keeping']).log()
+        # )
         selected_indices = scores.argmax(1)
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
