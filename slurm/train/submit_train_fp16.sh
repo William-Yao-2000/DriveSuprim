@@ -4,6 +4,7 @@ agent=hydra_plus
 dir=hydra_plus_16mixed
 bs=32
 nodes=2
+repeat=1
 
 #submit_job \
 #    --gpu 8 \
@@ -26,5 +27,5 @@ submit_job \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \
     --email_mode never \
     --duration 4 \
-    --dependent_clones 2 \
+    --dependent_clones $repeat \
     -c ". slurm/pre.sh; bash slurm/train/train_auto.sh ${agent} ${dir} ${bs}"
