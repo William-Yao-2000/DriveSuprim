@@ -48,12 +48,16 @@ run_train_from_scratch() {
 # Function to resume training from latest checkpoint
 resume_training() {
     local latest_epoch=$1
-    iter=$(echo "103288 / $bs / 8 / ${NUM_NODES}" | bc)
-    iter=$((iter + 1))
-    step=$(( (latest_epoch + 1) * iter ))
+    cd $ckpt_dir
+    for file in epoch=*-step=*.ckpt; do
+      epoch=$(echo $file | sed -n 's/.*epoch=\([0-9][0-9]\).*/\1/p')
+      new_filename="epoch${epoch}.ckpt"
+      mv "$file" "$new_filename"
+    done
+    cd $NAVSIM_NAVSIM_DEVKIT_ROOT
 
     padded_ckpt_epoch=$(printf "%02d" $latest_epoch)
-    resume="epoch\=${padded_ckpt_epoch}-step\=${step}.ckpt"
+    resume="epoch${padded_ckpt_epoch}.ckpt"
 
     command_string="
         MASTER_PORT=29500 MASTER_ADDR=${MASTER_ADDR} WORLD_SIZE=${NUM_NODES} NODE_RANK=${NODE_RANK} \
