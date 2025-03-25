@@ -75,8 +75,19 @@ def hydra_kd_imi_agent_loss(
     # 4, 9, ..., 39
     sampled_timepoints = [5 * k - 1 for k in range(1, 9)]
     B = target_traj.shape[0]
-    l2_distance = -((vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / config.sigma
-    imi_loss = F.cross_entropy(imi, l2_distance.sum((-2, -1)).softmax(1))
+
+    # l2_distance = -((vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / config.sigma
+    # l2_distance = l2_distance.sum((-2, -1))
+    # imi_loss = F.cross_entropy(imi, l2_distance.softmax(1))
+
+    # 16 mixed training
+    l2_distance = (vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2
+    l2_distance = l2_distance.sum((-2, -1))
+    min_idx = l2_distance.argmin(1)
+    imi_gt = torch.zeros_like(imi)
+    imi_gt = imi_gt.scatter_(1, min_idx.unsqueeze(1), 1)
+
+    imi_loss = F.cross_entropy(imi, imi_gt)
 
     imi_loss_final = config.trajectory_imi_weight * imi_loss
 
