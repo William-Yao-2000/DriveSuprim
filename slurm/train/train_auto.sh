@@ -10,7 +10,7 @@ config="competition_training"
 ckpt_dir="${NAVSIM_EXP_ROOT}/${dir}"
 
 export NCCL_DEBUG=INFO
-export NCCL_DEBUG_SUBSYS=ALL
+#export NCCL_DEBUG_SUBSYS=ALL
 export TORCH_DISTRIBUTED_DEBUG=INFO
 
 # Function to execute training from scratch
