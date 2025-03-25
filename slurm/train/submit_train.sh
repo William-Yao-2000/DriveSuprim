@@ -12,4 +12,5 @@ submit_job \
     --email_mode never \
     --duration 4 \
     --dependent_clones 1 \
+    --partition polar3 \
     -c ". slurm/pre.sh; bash slurm/train/train_auto.sh ${agent}"
