@@ -277,7 +277,7 @@ def main(cfg: DictConfig) -> None:
         for c in pdm_score_df.columns
         if (
                 (any(score.name in c for score in
-                     fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score")
+                     fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score" or c == 'old_pdms')
                 and c != "pdm_score"
         )
     ]
