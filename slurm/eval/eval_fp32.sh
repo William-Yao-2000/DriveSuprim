@@ -17,7 +17,7 @@ agent=$3
 # Format epoch with leading zero
 padded_epoch=$(printf "%02d" $epoch)
 
-metric_cache_path="/home/shiyil/work/zxli/navsim_workspace/exp2/navtest_metric_cache"
+metric_cache_path=${NAVSIM_EXP_ROOT}/navtest_metric_cache
 
 # Set experiment name based on inference model
 experiment_name="${dir}/test-${padded_epoch}ep"
