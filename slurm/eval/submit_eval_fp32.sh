@@ -14,7 +14,6 @@ for i in {10..19}; do
     --image /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/lzx-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \
     --email_mode never \
-    --account av_research \
     --duration 4 \
     --dependent_clones 0 \
     -c ". slurm/pre.sh; bash slurm/eval/eval_fp32.sh ${i} $dir $agent"
