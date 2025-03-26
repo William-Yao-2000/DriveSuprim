@@ -16,6 +16,6 @@ for i in {10..19}; do
     --email_mode never \
     --duration 4 \
     --dependent_clones 0 \
-    -c ". slurm/pre.sh; bash slurm/eval_fp32.sh ${i} $dir $agent"
+    -c ". slurm/pre.sh; bash slurm/eval/eval_fp32.sh ${i} $dir $agent"
 done
 
