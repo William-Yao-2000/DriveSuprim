@@ -130,9 +130,7 @@ def main(cfg: DictConfig) -> None:
     """
 
     build_logger(cfg)
-    worker = build_worker(cfg)
 
-    # GPU INFERENCE
     # gpu inference
     agent: AbstractAgent = instantiate(cfg.agent)
     agent.initialize()
@@ -217,6 +215,8 @@ def main(cfg: DictConfig) -> None:
         }
         for log_file, tokens_list in scene_loader.get_tokens_list_per_log().items()
     ]
+
+    worker = build_worker(cfg)
     score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score_wo_inference, data_points)
 
     pdm_score_df = pd.concat(score_rows)
