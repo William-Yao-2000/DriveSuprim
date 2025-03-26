@@ -6,7 +6,9 @@
 
 # IDE
 .vscode/*
-
+lightning_logs/
+lightning_logs/*
+lightning_logs
 # Pip
 *.egg-info
 

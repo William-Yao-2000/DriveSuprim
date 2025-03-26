@@ -70,7 +70,6 @@ class AgentLightningModule(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
-        self.total_predictions += 1
         return self.predict_step_hydra(batch, batch_idx)
 
     def predict_step_hydra(

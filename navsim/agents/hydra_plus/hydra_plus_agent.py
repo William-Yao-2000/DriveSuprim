@@ -146,8 +146,9 @@ class HydraPlusAgent(AbstractAgent):
         self.model = HydraModel(config)
         self.vocab_size = config.vocab_size
         self.backbone_wd = config.backbone_wd
-        self.vocab_pdm_score_full = pickle.load(
-            open(f'{TRAJ_PDM_ROOT}/{pdm_gt_path}', 'rb'))
+        if pdm_gt_path is not None:
+            self.vocab_pdm_score_full = pickle.load(
+                open(f'{TRAJ_PDM_ROOT}/{pdm_gt_path}', 'rb'))
 
     def name(self) -> str:
         """Inherited, see superclass."""

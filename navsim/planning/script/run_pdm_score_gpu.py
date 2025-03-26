@@ -38,7 +38,7 @@ from navsim.traffic_agents_policies.abstract_traffic_agents_policy import Abstra
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = "config/pdm_scoring"
-CONFIG_NAME = "default_run_pdm_score"
+CONFIG_NAME = "default_run_pdm_score_gpu"
 
 
 # TODO gpu inference
@@ -220,7 +220,12 @@ def main(cfg: DictConfig) -> None:
     score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score_wo_inference, data_points)
 
     pdm_score_df = pd.concat(score_rows)
-
+    old_pdms = (pdm_score_df['no_at_fault_collisions'] *
+                pdm_score_df['drivable_area_compliance'] *
+                ((5 * pdm_score_df['ego_progress'] +
+                  5 * pdm_score_df['time_to_collision_within_bound'] +
+                  2 * pdm_score_df['history_comfort']) / 12))
+    pdm_score_df['old_pdms'] = old_pdms
     # Calculate two-frame extended comfort
     two_frame_comfort_df = calculate_two_frame_extended_comfort(
         pdm_score_df, proposal_sampling=instantiate(cfg.simulator.proposal_sampling)
@@ -311,6 +316,7 @@ def main(cfg: DictConfig) -> None:
             Number of successful scenarios: {num_sucessful_scenarios}.
             Number of failed scenarios: {num_failed_scenarios}.
             Final average score of valid results: {pdm_score_df['score'].mean()}.
+            Final old PDMS: {pdm_score_df['old_pdms'].mean()}.
             Results are stored in: {save_path / f"{timestamp}.csv"}.
         """
     )
