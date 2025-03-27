@@ -11,7 +11,5 @@ submit_job \
     --email_mode never \
     --duration 4 \
     --dependent_clones 1 \
-    --partition cpu_short \
-    --mem 170 \
-    --cpu 96 \
+    --partition cpu_short,cpu_long,cpu,cpu_interactive \
     -c ". slurm/pre.sh; bash slurm/gen/gen.sh $1 $2"
