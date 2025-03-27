@@ -4,7 +4,7 @@ import pickle
 traj_root = os.getenv('NAVSIM_TRAJPDM_ROOT')
 
 if __name__ == '__main__':
-    out_dir = 'vocab_score_full_16384_navtest_v2'
+    out_dir = 'vocab_score_full_16384_navtest_v2ep'
     ins = [f'navtest_sub{i}_v2.pkl' for i in range(1, 17)]
     out = 'navtest.pkl'
 
