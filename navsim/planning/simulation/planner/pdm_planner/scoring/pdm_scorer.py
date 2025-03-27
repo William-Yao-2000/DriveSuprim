@@ -256,7 +256,8 @@ class PDMScorer:
             smaller_and_bad = np.logical_and(bad_mask, smaller_than_t_mask)
 
             normalized_progress = np.ones_like(masked_progress)
-            normalized_progress[smaller_and_bad] = 0.0
+            # previous protocol
+            # normalized_progress[smaller_and_bad] = 0.0
             normalized_progress[bigger_than_t_mask] = masked_progress[bigger_than_t_mask] / max_raw_progress[
                 bigger_than_t_mask]
         else:
