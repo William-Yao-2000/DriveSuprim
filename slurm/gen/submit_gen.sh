@@ -6,7 +6,7 @@ submit_job \
     --gpu 1 \
     --tasks_per_node 1 \
     --nodes 1 \
-    -n "zx_gen" \
+    -n "zx_gen_navtrain" \
     --image /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/lzx-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \
     --email_mode never \
