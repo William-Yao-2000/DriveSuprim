@@ -5,6 +5,8 @@ import pickle
 import numpy as np
 import torch
 
+from navsim.planning.simulation.planner.pdm_planner.utils.pdm_enums import WeightedMetricIndex
+
 logger = logging.getLogger(__name__)
 
 """
@@ -20,37 +22,34 @@ parser.add_argument('--pkl_path', required=True)
 def linspace(start, end, cnt):
     return list(np.linspace(start, end, num=(cnt + 1)))
 
-class PDMScorerConfigExpanded:
-    # weighted metric weights
-    progress_weight: float = 5.0
-    ttc_weight: float = 5.0
-    comfortable_weight: float = 5.0
-    lk_weight: float = 5.0
 
-    # thresholds
-    driving_direction_horizon: float = 1.0  # [s] (driving direction)
-    driving_direction_compliance_threshold: float = 0.5  # [m] (driving direction)
-    driving_direction_violation_threshold: float = 1.5  # [m] (driving direction)
-    stopped_speed_threshold: float = 5e-03  # [m/s] (ttc)
-    progress_distance_threshold: float = 0.1  # [m] (progress)
+def aggregate_old_pdms(gt_score):
+    weighted_metrics_array = np.zeros(3, dtype=np.float64)
+    weighted_metrics_array[0] = 5.0
+    weighted_metrics_array[1] = 5.0
+    weighted_metrics_array[2] = 2.0
+    _weighted_metrics = np.zeros(
+        (3, 16384), dtype=np.float64
+    )
+    _multi_metrics = np.zeros(
+        (2, 16384), dtype=np.float64
+    )
+    _weighted_metrics[0] = gt_score['ego_progress']
+    _weighted_metrics[1] = gt_score['time_to_collision_within_bound']
+    _weighted_metrics[2] = gt_score['history_comfort']
 
-    @property
-    def weighted_metrics_array(self) :
-        weighted_metrics = np.zeros(4, dtype=np.float64)
-        weighted_metrics[0] = self.progress_weight
-        weighted_metrics[1] = self.ttc_weight
-        weighted_metrics[2] = self.comfortable_weight
-        # weighted_metrics[WeightedMetricIndex.LANE_KEEPING] = self.lk_weight
-        return weighted_metrics
+    _multi_metrics[0] = gt_score['no_at_fault_collisions']
+    _multi_metrics[1] = gt_score['drivable_area_compliance']
 
-    @property
-    def weighted_metrics_array_expand(self) :
-        weighted_metrics = np.zeros(4, dtype=np.float64)
-        weighted_metrics[0] = self.progress_weight
-        weighted_metrics[1] = self.ttc_weight
-        weighted_metrics[2] = self.comfortable_weight
-        weighted_metrics[3] = self.lk_weight
-        return weighted_metrics
+    weighted_metric_scores = (_weighted_metrics * weighted_metrics_array[..., None]).sum(
+        axis=0
+    )
+    weighted_metric_scores /= weighted_metrics_array.sum()
+    # _multi_metrics = np.nan_to_num(_multi_metrics, nan=0.0, posinf=0.0, neginf=0.0)
+    # weighted_metric_scores = np.nan_to_num(weighted_metric_scores, nan=0.0, posinf=0.0, neginf=0.0)
+    # calculate final scores
+    final_scores = _multi_metrics.prod(axis=0) * weighted_metric_scores
+    return final_scores
 
 
 def main() -> None:
@@ -59,15 +58,9 @@ def main() -> None:
 
     merged_predictions = pickle.load(open(pkl_path, 'rb'))
     navtest_scores = pickle.load(
-        open(f'{os.getenv("NAVSIM_TRAJPDM_ROOT")}/vocab_score_full_8192_navtest/navtest.pkl', 'rb')
+        open(f'{os.getenv("NAVSIM_TRAJPDM_ROOT")}/vocab_score_full_16384_navtest_v2/navtest.pkl', 'rb')
     )
-    navtest_scores_expand = pickle.load(
-        open(f'{os.getenv("NAVSIM_TRAJPDM_ROOT")}/vocab_expanded_8192_navtest/navtest.pkl', 'rb')
-    )
-    navtest_scores_newlk = pickle.load(
-        open(f'{os.getenv("NAVSIM_TRAJPDM_ROOT")}/vocab_newlk_8192_navtest/navtest.pkl', 'rb')
-    )
-    # print(navtest_scores.keys())
+
     # standard
     # imi_weights = [0.01 * tmp for tmp in range(1, 11)]
     # noc_weights = [0.1 * tmp for tmp in range(1, 11)]
@@ -78,9 +71,9 @@ def main() -> None:
     # comfort_weights = [2.0]
     # scores = (
     #         0.05 * result['imi'].softmax(-1).log() +
-    #         0.5 * result['noc'].log() +
-    #         0.5 * result['da'].log() +
-    #         8.0 * (5 * result['ttc'] + 2 * result['comfort'] + 5 * result['progress']).log()
+    #         0.5 * result['no_at_fault_collisions].log() +
+    #         0.5 * result['drivable_area_compliance].log() +
+    #         8.0 * (5 * result['time_to_collision_within_bound'] + 2 * result['history_comfort'] + 5 * result['ego_progress']).log()
     # )
     # temporary
     # imi_weights = [0.01 * tmp for tmp in range(1, 101)]
@@ -91,20 +84,16 @@ def main() -> None:
     # progress_weights = [5.0]
     # comfort_weights = [2.0]
 
-    # imi_weights = [0.0025 * tmp for tmp in range(2, 6)]
-    imi_weights = [0.01]
-    # noc_weights = [0.0025 * tmp for tmp in range(3, 6)]
-    noc_weights = [0.01]
-    # da_weights = [0.0025 * tmp for tmp in range(3, 6)]
-    da_weights = [0.0025 * tmp for tmp in range(3, 6)]
-    # lk_weights = [0.0125 * tmp for tmp in range(3, 7)]
-    lk_weights = [0.5 * tmp for tmp in range(1, 10)]
-    # dd_weights = [0.0125 * tmp for tmp in range(3, 7)]
-    dd_weights = [0.0125 * tmp for tmp in range(3, 7)]
-    tl_weights = [1.0 * tmp for tmp in range(1, 10)]
-    tpc_weights = [3.5]
-    ttc_weights = [7.0]
-    progress_weights = [1.0 * tmp for tmp in range(3, 6)]
+    imi_weights = [0.05]
+    noc_weights = [0.5]
+    da_weights = [0.5]
+    dd_weights = [0.5]
+    tl_weights = [0.5]
+    tpc_weights = [8.0]
+    ttc_weights = [5.0]
+    progress_weights = [5.0]
+    lk_weights = [5]
+
     comfort_weights = [1.0]
 
     # imi_weights = [0.01]
@@ -129,72 +118,43 @@ def main() -> None:
      comfort_preds,
      lk_preds,
      tl_preds) = ([], [],
-                       [], [],
-                       [], [],
-                       [], [], [])
-    pdm_scores, noc_scores, da_scores, dd_scores, ttc_scores, progress_scores, comfort_scores, lk_scores, tl_scores= (
-    [], [], [], [], [], [], [], [], [])
+                  [], [],
+                  [], [],
+                  [], [], [])
+    pdm_scores, noc_scores, da_scores, dd_scores, ttc_scores, progress_scores, comfort_scores, lk_scores, tl_scores = (
+        [], [], [], [], [], [], [], [], [])
+    old_pdm_scores = []
     total_scene_cnt = len(navtest_scores)
     print(f'total_scene_cnt: {total_scene_cnt}')
-    for k, v in navtest_scores.items():
-        vv = navtest_scores_expand[k]
-        vvv = navtest_scores_newlk[k]
-
-        # pdm_scores.append(torch.from_numpy(v['total_expand'][None]).cuda())
-        noc_scores.append(torch.from_numpy(v['noc'][None]).cuda())
-        da_scores.append(torch.from_numpy(v['da'][None]).cuda())
-        dd_scores.append(torch.from_numpy(vv['dr'][None]).cuda())
-        ttc_scores.append(torch.from_numpy(v['ttc'][None]).cuda())
-        progress_scores.append(torch.from_numpy(v['progress'][None]).cuda())
-        # comfort_scores.append(torch.from_numpy(merged_predictions[k]['comfort'][None]).cuda())
-        lk_scores.append(torch.from_numpy(vvv['lk'][None]).cuda())
-        tl_scores.append(torch.from_numpy(vv['tl'][None]).cuda())
+    for k, gt_score in navtest_scores.items():
+        pdm_scores.append(torch.from_numpy(gt_score['pdm_score'][None]).cuda())
+        noc_scores.append(torch.from_numpy(gt_score['no_at_fault_collisions'][None]).cuda())
+        da_scores.append(torch.from_numpy(gt_score['drivable_area_compliance'][None]).cuda())
+        dd_scores.append(torch.from_numpy(gt_score['driving_direction_compliance'][None]).cuda())
+        ttc_scores.append(torch.from_numpy(gt_score['time_to_collision_within_bound'][None]).cuda())
+        progress_scores.append(torch.from_numpy(gt_score['ego_progress'][None]).cuda())
+        # comfort_scores.append(torch.from_numpy(merged_predictions[k]['history_comfort'][None]).cuda())
+        lk_scores.append(torch.from_numpy(gt_score['lane_keeping'][None]).cuda())
+        tl_scores.append(torch.from_numpy(gt_score['traffic_light_compliance'][None]).cuda())
+        old_pdm_scores.append(torch.from_numpy(aggregate_old_pdms(
+            gt_score
+        )[None]).cuda())
 
         imi_preds.append(torch.from_numpy(merged_predictions[k]['imi'][None]).cuda())
-        noc_preds.append(torch.from_numpy(merged_predictions[k]['noc'][None]).cuda())
-        da_preds.append(torch.from_numpy(merged_predictions[k]['da'][None]).cuda())
-        ttc_preds.append(torch.from_numpy(merged_predictions[k]['ttc'][None]).cuda())
-        progress_preds.append(torch.from_numpy(merged_predictions[k]['progress'][None]).cuda())
-        # comfort_preds.append(torch.from_numpy(merged_predictions[k]['comfort'][None]).cuda())
-        lk_preds.append(torch.from_numpy(merged_predictions[k]['lk'][None]).cuda())
-        tl_preds.append(torch.from_numpy(merged_predictions[k]['tl'][None]).cuda())
-        dd_preds.append(torch.from_numpy(merged_predictions[k]['dr'][None]).cuda())
-
-        config = PDMScorerConfigExpanded()
-        weighted_metrics_array = config.weighted_metrics_array_expand
-        _weighted_metrics = np.zeros(
-            (4, 8192), dtype=np.float64
-        )
-        _multi_metrics = np.zeros(
-            (4, 8192), dtype=np.float64
-        )
-        # print(v['progress'], v['ttc'])
-        _weighted_metrics[0] = v['progress']
-        _weighted_metrics[1] = v['ttc']
-        _weighted_metrics[2] = np.full_like(v['progress'], 0.9683)
-        _weighted_metrics[3] = vvv['lk']
-
-        _multi_metrics[0] = v['noc']
-        _multi_metrics[1] = v['da']
-        _multi_metrics[2] = vv['dr']
-        _multi_metrics[3] = vv['tl']
-
-        weighted_metric_scores = (_weighted_metrics * weighted_metrics_array[..., None]).sum(
-            axis=0
-        )
-        weighted_metric_scores /= weighted_metrics_array.sum()
-        # _multi_metrics = np.nan_to_num(_multi_metrics, nan=0.0, posinf=0.0, neginf=0.0)
-        # weighted_metric_scores = np.nan_to_num(weighted_metric_scores, nan=0.0, posinf=0.0, neginf=0.0)
-        # calculate final scores
-        final_scores = _multi_metrics.prod(axis=0) * weighted_metric_scores
-        pdm_scores.append(torch.from_numpy(final_scores[None]).cuda())
-
+        noc_preds.append(torch.from_numpy(merged_predictions[k]['no_at_fault_collisions'][None]).cuda())
+        da_preds.append(torch.from_numpy(merged_predictions[k]['drivable_area_compliance'][None]).cuda())
+        ttc_preds.append(torch.from_numpy(merged_predictions[k]['time_to_collision_within_bound'][None]).cuda())
+        progress_preds.append(torch.from_numpy(merged_predictions[k]['ego_progress'][None]).cuda())
+        # comfort_preds.append(torch.from_numpy(merged_predictions[k]['history_comfort'][None]).cuda())
+        lk_preds.append(torch.from_numpy(merged_predictions[k]['lane_keeping'][None]).cuda())
+        tl_preds.append(torch.from_numpy(merged_predictions[k]['traffic_light_compliance'][None]).cuda())
+        dd_preds.append(torch.from_numpy(merged_predictions[k]['driving_direction_compliance'][None]).cuda())
 
 
     pdm_scores = torch.cat(pdm_scores, 0).contiguous()
+    old_pdm_scores = torch.cat(old_pdm_scores, 0).contiguous()
     noc_scores = torch.cat(noc_scores, 0).contiguous()
     da_scores = torch.cat(da_scores, 0).contiguous()
-    # dd_scores = torch.cat(dd_scores, 0).contiguous()
     ttc_scores = torch.cat(ttc_scores, 0).contiguous()
     progress_scores = torch.cat(progress_scores, 0).contiguous()
     # comfort_scores = torch.cat(comfort_scores, 0).contiguous()
@@ -212,9 +172,9 @@ def main() -> None:
     tl_preds = torch.cat(tl_preds, 0).contiguous()
     dd_preds = torch.cat(dd_preds, 0).contiguous()
 
-    rows = []
+    search_cnt = 0
     highest_info = {
-        'score': -100,
+        'pdms': -100,
     }
     for lk_weight in lk_weights:
         for tl_weight in tl_weights:
@@ -243,6 +203,10 @@ def main() -> None:
                                             chosen_idx = scores.argmax(-1)
                                             scene_cnt_tensor = torch.arange(total_scene_cnt, device=pdm_scores.device)
                                             pdm_score = pdm_scores[
+                                                scene_cnt_tensor,
+                                                chosen_idx
+                                            ]
+                                            old_pdm_score = old_pdm_scores[
                                                 scene_cnt_tensor,
                                                 chosen_idx
                                             ]
@@ -280,6 +244,7 @@ def main() -> None:
                                             ]
 
                                             pdm_score = pdm_score.mean().item()
+                                            old_pdm_score = old_pdm_score.mean().item()
                                             noc_score = noc_score.float().mean().item()
                                             da_score = da_score.float().mean().item()
                                             dd_score = dd_score.float().mean().item()
@@ -288,29 +253,18 @@ def main() -> None:
                                             ttc_score = ttc_score.float().mean().item()
                                             progress_score = progress_score.float().mean().item()
                                             # comfort_score = comfort_score.float().mean().item()
-                                            row = {
-                                                'imi_weight': imi_weight,
-                                                'noc_weight': noc_weight,
-                                                'da_weight': da_weight,
-                                                'ttc_weight': ttc_weight,
-                                                'progress_weight': progress_weight,
-                                                'comfort_weight': comfort_weight,
-                                                'tpc_weight': tpc_weight,
-                                                'lk_weight': lk_weight,
-                                                'tl_weight': tl_weight,
-                                                'dd_weight': dd_weight,
-                                                'overall_score': pdm_score
-                                            }
-                                            if pdm_score > highest_info['score']:
-                                                highest_info['score'] = pdm_score
-                                                highest_info['noc'] = noc_score
-                                                highest_info['da'] = da_score
-                                                highest_info['dd'] = dd_score
-                                                highest_info['ttc'] = ttc_score
-                                                highest_info['lk'] = lk_score
-                                                highest_info['tl'] = tl_score
-                                                highest_info['progress'] = progress_score
-                                                # highest_info['comfort'] = comfort_score
+
+                                            if pdm_score > highest_info['pdms']:
+                                                highest_info['pdms'] = pdm_score
+                                                highest_info['old_pdms'] = old_pdm_score
+                                                highest_info['no_at_fault_collisions'] = noc_score
+                                                highest_info['drivable_area_compliance'] = da_score
+                                                highest_info['driving_direction_compliance'] = dd_score
+                                                highest_info['time_to_collision_within_bound'] = ttc_score
+                                                highest_info['lane_keeping'] = lk_score
+                                                highest_info['traffic_light_compliance'] = tl_score
+                                                highest_info['ego_progress'] = progress_score
+                                                # highest_info['history_comfort'] = comfort_score
                                                 highest_info['imi_weight'] = imi_weight
                                                 highest_info['noc_weight'] = noc_weight
                                                 highest_info['da_weight'] = da_weight
@@ -321,13 +275,11 @@ def main() -> None:
                                                 highest_info['lk_weight'] = lk_weight
                                                 highest_info['tl_weight'] = tl_weight
                                                 highest_info['dd_weight'] = dd_weight
-                                            print(f'Done: {len(rows)}. score: {pdm_score}')
-                                            rows.append(row)
-    # save rows
-    # pdm_score_df = pd.DataFrame(rows)
-    # pdm_score_df.to_csv(Path(csv_path))
-    for k, v in highest_info.items():
-        print(k, v)
+                                            search_cnt += 1
+                                            print(f'Done: {search_cnt}. pdms: {pdm_score}. old_pdms: {old_pdm_score}')
+
+    for k, gt_score in highest_info.items():
+        print(k, gt_score)
 
 
 if __name__ == "__main__":
