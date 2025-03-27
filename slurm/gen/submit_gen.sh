@@ -12,6 +12,6 @@ submit_job \
     --duration 4 \
     --dependent_clones 1 \
     --partition cpu_short \
-    --mem 170g \
+    --mem 170 \
     --cpu 96 \
     -c ". slurm/pre.sh; bash slurm/gen/gen.sh $1 $2"
