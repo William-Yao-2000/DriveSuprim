@@ -1,6 +1,6 @@
 import yaml
 
-N = 64
+N = 10
 root = '/mnt/f/e2e/navsim2/navsim/planning/script/config/common/train_test_split'
 tgt_yaml = 'navtrain'
 
