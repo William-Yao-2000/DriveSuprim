@@ -1,5 +1,6 @@
 export split=$1
 export part=$2
+export PROGRESS_MODE=gen_gt
 python $NAVSIM_DEVKIT_ROOT/navsim/agents/tools/gen_vocab_score.py \
 train_test_split=${split}_${part} \
 experiment_name=debug \

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 trajpdm_root = os.getenv('NAVSIM_TRAJPDM_ROOT')
 devkit_root = os.getenv('NAVSIM_DEVKIT_ROOT')
 traj_path = f"{devkit_root}/traj_final/test_{vocab_size}_rearaxle_kmeans.npy"
-dir = f'vocab_score_full_{vocab_size}_{os.getenv("split", "navtrain")}_v2'
+dir = f'vocab_score_full_{vocab_size}_{os.getenv("split", "navtrain")}_v2ep'
 CONFIG_PATH = f"{devkit_root}/navsim/planning/script/config/pdm_scoring"
 CONFIG_NAME = "default_run_pdm_score"
 

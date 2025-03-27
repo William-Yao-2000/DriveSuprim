@@ -1,4 +1,5 @@
 import copy
+import os
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -235,11 +236,37 @@ class PDMScorer:
 
         # normalize and fill progress values
         masked_progress = self._progress_raw * multiplicate_metric_scores
-        norm_constant_progress = np.max(masked_progress)
-        if norm_constant_progress > self._config.progress_distance_threshold:
-            normalized_progress = np.clip(self._progress_raw / norm_constant_progress, 0.0, 1.0)
+
+        if os.environ.get('PROGRESS_MODE', 'eval') == 'gen_gt':
+            print('Using gen_gt mode for ep!')
+            N = masked_progress.shape[0]
+            pdm_progress = np.repeat(masked_progress[0], N)[..., None]
+            combined_progress = np.concatenate([masked_progress[..., None], pdm_progress], axis=1)
+            max_raw_progress = np.max(
+                combined_progress,
+                axis=1
+            )
+            # three cases:
+            # 1. bigger than t ---------- normalize
+            # 2. smaller than t & score!=0 -------- 1
+            # 3. smaller than t & score==0 -------- 0
+            bigger_than_t_mask = max_raw_progress > self._config.progress_distance_threshold
+            smaller_than_t_mask = np.logical_not(bigger_than_t_mask)
+            bad_mask = multiplicate_metric_scores == 0.0
+            smaller_and_bad = np.logical_and(bad_mask, smaller_than_t_mask)
+
+            normalized_progress = np.ones_like(masked_progress)
+            normalized_progress[smaller_and_bad] = 0.0
+            normalized_progress[bigger_than_t_mask] = masked_progress[bigger_than_t_mask] / max_raw_progress[
+                bigger_than_t_mask]
         else:
-            normalized_progress = np.ones(len(masked_progress), dtype=np.float64)
+            norm_constant_progress = np.max(masked_progress)
+            if norm_constant_progress > self._config.progress_distance_threshold:
+                normalized_progress = np.clip(self._progress_raw / norm_constant_progress, 0.0, 1.0)
+            else:
+                normalized_progress = np.ones(len(masked_progress), dtype=np.float64)
+
+
         self._weighted_metrics[WeightedMetricIndex.PROGRESS] = normalized_progress
 
         # Exclude the two-frame extended comfort metric from the weighted metrics calculation.
