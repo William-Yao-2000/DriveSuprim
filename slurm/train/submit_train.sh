@@ -10,7 +10,7 @@ submit_job \
     --tasks_per_node 8 \
     --account av_research \
     --nodes ${nodes} \
-    --partition interactive \
+    --partition polar3 \
     -n "zxtrain2" \
     --image /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/lzx-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \
