@@ -24,7 +24,7 @@ run_train_from_scratch() {
             --config-name $config \
             trainer.params.num_nodes=${NUM_NODES} \
             agent=$agent \
-            agent.pdm_gt_path=vocab_score_full_16384_navtrain_v2/navtrain.pkl \
+            agent.pdm_gt_path=vocab_score_full_16384_navtrain_v2ep/navtrain.pkl \
             experiment_name=$dir \
             train_test_split=navtrain \
             dataloader.params.batch_size=$bs \
@@ -59,7 +59,7 @@ resume_training() {
             trainer.params.num_nodes=${NUM_NODES} \
             +resume_ckpt_path='${NAVSIM_EXP_ROOT}/$dir/$resume' \
             agent=$agent \
-            agent.pdm_gt_path=vocab_score_full_16384_navtrain_v2/navtrain.pkl \
+            agent.pdm_gt_path=vocab_score_full_16384_navtrain_v2ep/navtrain.pkl \
             experiment_name=$dir \
             train_test_split=navtrain \
             dataloader.params.batch_size=$bs \

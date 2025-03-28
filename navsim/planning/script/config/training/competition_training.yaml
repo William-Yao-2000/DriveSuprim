@@ -38,7 +38,7 @@ trainer:
 
     accelerator: gpu  # distribution method
     strategy: ddp
-    precision: 16-mixed  # floating point precision
+    precision: 32  # floating point precision
     num_nodes: 1  # Number of nodes used for training
 
     num_sanity_val_steps: 0  # number of validation steps to run before training begins
