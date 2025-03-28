@@ -20,6 +20,7 @@ submit_job \
     --tasks_per_node 1 \
     --nodes 1 \
     --gpu 1 \
+    --account av_research \
     -n "bash" \
     --image /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/lzx-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \

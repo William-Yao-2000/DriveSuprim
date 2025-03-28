@@ -58,7 +58,7 @@ def main() -> None:
 
     merged_predictions = pickle.load(open(pkl_path, 'rb'))
     navtest_scores = pickle.load(
-        open(f'{os.getenv("NAVSIM_TRAJPDM_ROOT")}/vocab_score_full_16384_navtest_v2/navtest.pkl', 'rb')
+        open(f'{os.getenv("NAVSIM_TRAJPDM_ROOT")}/vocab_score_full_16384_navtest_v2ep_hard/navtest.pkl', 'rb')
     )
 
     # standard
