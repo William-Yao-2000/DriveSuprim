@@ -22,14 +22,14 @@ seed: 0
 
 dataloader:
   params:
-#    batch_size: 64  # number of samples per batch
-#    num_workers: 4  # number of workers for data loading
-#    pin_memory: true  # pin memory for faster GPU transfer
-#    prefetch_factor: 2  # number of samples loaded in advance by each worker
     batch_size: 64  # number of samples per batch
     num_workers: 4  # number of workers for data loading
-    pin_memory: false  # pin memory for faster GPU transfer
-    prefetch_factor: null  # number of samples loaded in advance by each worker
+    pin_memory: true  # pin memory for faster GPU transfer
+    prefetch_factor: 2  # number of samples loaded in advance by each worker
+#    batch_size: 64  # number of samples per batch
+#    num_workers: 4  # number of workers for data loading
+#    pin_memory: false  # pin memory for faster GPU transfer
+#    prefetch_factor: null  # number of samples loaded in advance by each worker
 
 trainer:
   params:

@@ -8,13 +8,12 @@ nodes=3
 submit_job \
     --gpu 8 \
     --tasks_per_node 8 \
-    --account av_research \
+    --account av_alpamayo_research \
     --nodes ${nodes} \
-    -n "zxtrain2" \
+    -n "bash" \
     --image /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/lzx-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \
     --email_mode never \
     --duration 4 \
     --dependent_clones 2 \
-    --partition interactive \
     -c ". slurm/pre.sh; bash slurm/train/train_auto_fp32.sh ${agent} ${dir} ${bs}"
