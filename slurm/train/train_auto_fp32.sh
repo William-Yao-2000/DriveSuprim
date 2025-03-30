@@ -15,7 +15,7 @@ ckpt_dir="${NAVSIM_EXP_ROOT}/${dir}"
 #export NCCL_DEBUG=INFO
 #export NCCL_DEBUG_SUBSYS=ALL
 #export TORCH_DISTRIBUTED_DEBUG=INFO
-export NCCL_P2P_DISABLE=1
+#export NCCL_P2P_DISABLE=1
 
 # Function to execute training from scratch
 run_train_from_scratch() {
