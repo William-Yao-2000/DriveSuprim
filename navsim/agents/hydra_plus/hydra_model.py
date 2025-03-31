@@ -233,27 +233,40 @@ class HydraTrajHead(nn.Module):
             #     result[k] = head(dist_status).squeeze(-1)
             # else:
             #     result[k] = head(dist_status).squeeze(-1).sigmoid()
+        # imi_weight        0.03
+        # noc_weight        0.1
+        # da_weight        0.9
+        # ttc_weight        7.0
+        # progress_weight        7.0
+        # comfort_weight        1.0
+        # tpc_weight        6.0
+        # lk_weight        3.0
+        # tl_weight        0.1
+        # dd_weight        0.2
         scores = (
-                0.05 * result['imi'].softmax(-1).log() +
-                0.5 * result['traffic_light_compliance'].sigmoid().log() +
-                0.5 * result['no_at_fault_collisions'].sigmoid().log() +
-                0.5 * result['drivable_area_compliance'].sigmoid().log() +
-                0.5 * result['driving_direction_compliance'].sigmoid().log() +
-                8.0 * (5 * result['time_to_collision_within_bound'].sigmoid() +
-                       5 * result['ego_progress'].sigmoid() +
-                       5 * result['lane_keeping'].sigmoid()).log()
+                0.03 * result['imi'].softmax(-1).log() +
+                0.1 * result['traffic_light_compliance'].sigmoid().log() +
+                0.1 * result['no_at_fault_collisions'].sigmoid().log() +
+                0.9 * result['drivable_area_compliance'].sigmoid().log() +
+                0.2 * result['driving_direction_compliance'].sigmoid().log() +
+                6.0 * (7.0 * result['time_to_collision_within_bound'].sigmoid() +
+                       7.0 * result['ego_progress'].sigmoid() +
+                       3.0 * result['lane_keeping'].sigmoid()).log()
         )
 
+        # baseline
         # scores = (
         #         0.05 * result['imi'].softmax(-1).log() +
-        #         0.5 * result['traffic_light_compliance'].log() +
-        #         0.5 * result['no_at_fault_collisions'].log() +
-        #         0.5 * result['drivable_area_compliance'].log() +
-        #         0.5 * result['driving_direction_compliance'].log() +
-        #         8.0 * (5 * result['time_to_collision_within_bound'] +
-        #                5 * result['ego_progress'] +
-        #                5 * result['lane_keeping']).log()
+        #         0.5 * result['traffic_light_compliance'].sigmoid().log() +
+        #         0.5 * result['no_at_fault_collisions'].sigmoid().log() +
+        #         0.5 * result['drivable_area_compliance'].sigmoid().log() +
+        #         0.5 * result['driving_direction_compliance'].sigmoid().log() +
+        #         8.0 * (5 * result['time_to_collision_within_bound'].sigmoid() +
+        #                5 * result['ego_progress'].sigmoid() +
+        #                5 * result['lane_keeping'].sigmoid()).log()
         # )
+
+
         selected_indices = scores.argmax(1)
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
