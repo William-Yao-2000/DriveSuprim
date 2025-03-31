@@ -4,6 +4,7 @@ import pickle
 
 import numpy as np
 import torch
+import tqdm
 
 from navsim.planning.simulation.planner.pdm_planner.utils.pdm_enums import WeightedMetricIndex
 
@@ -84,11 +85,11 @@ def main() -> None:
     # progress_weights = [5.0]
     # comfort_weights = [2.0]
 
-    imi_weights = [0.05]
-    noc_weights = [0.5]
-    da_weights = [0.5]
-    dd_weights = [0.5]
-    tl_weights = [0.5]
+    imi_weights = [0.001, 0.0025, 0.005, 0.0075, 0.01, 0.025, 0.05, 0.075, 0.1]
+    noc_weights = [0.1, 0.25, 0.5]
+    da_weights = [0.1, 0.25, 0.5]
+    dd_weights = [0.1, 0.25, 0.5]
+    tl_weights = [0.1]
     tpc_weights = [8.0]
     ttc_weights = [5.0]
     progress_weights = [5.0]
@@ -126,7 +127,7 @@ def main() -> None:
     old_pdm_scores = []
     total_scene_cnt = len(navtest_scores)
     print(f'total_scene_cnt: {total_scene_cnt}')
-    for k, gt_score in navtest_scores.items():
+    for k, gt_score in tqdm.tqdm(navtest_scores.items()):
         pdm_scores.append(torch.from_numpy(gt_score['pdm_score'][None]).cuda())
         noc_scores.append(torch.from_numpy(gt_score['no_at_fault_collisions'][None]).cuda())
         da_scores.append(torch.from_numpy(gt_score['drivable_area_compliance'][None]).cuda())
