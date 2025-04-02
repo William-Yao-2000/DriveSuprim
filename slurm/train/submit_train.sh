@@ -8,7 +8,7 @@ nodes=3
 submit_job \
     --gpu 8 \
     --tasks_per_node 8 \
-    --account av_alpamayo_research \
+    --account av_research \
     --nodes ${nodes} \
     -n "bash" \
     --image /lustre/fsw/portfolios/av/users/zhenxinl/navsim_workspace/lzx-navsim.sqsh \
