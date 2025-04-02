@@ -5,7 +5,7 @@ from typing import Any, Union
 import numpy as np
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
+from torch.optim.lr_scheduler import LRScheduler, OneCycleLR
 
 from navsim.agents.hydra_plus.hydra_features import HydraFeatureBuilder, HydraTargetBuilder
 from navsim.agents.hydra_plus.hydra_model import HydraModel
@@ -60,14 +60,19 @@ def hydra_kd_imi_agent_loss(
     imi = predictions['imi']
     dtype = imi.dtype
     # 2 cls
-    da_loss = F.binary_cross_entropy_with_logits(drivable_area_compliance, vocab_pdm_score['drivable_area_compliance'].to(dtype))
-    ttc_loss = F.binary_cross_entropy_with_logits(time_to_collision_within_bound, vocab_pdm_score['time_to_collision_within_bound'].to(dtype))
-    noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, three_to_two_classes(vocab_pdm_score['no_at_fault_collisions'].to(dtype)))
+    da_loss = F.binary_cross_entropy_with_logits(drivable_area_compliance,
+                                                 vocab_pdm_score['drivable_area_compliance'].to(dtype))
+    ttc_loss = F.binary_cross_entropy_with_logits(time_to_collision_within_bound,
+                                                  vocab_pdm_score['time_to_collision_within_bound'].to(dtype))
+    noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, three_to_two_classes(
+        vocab_pdm_score['no_at_fault_collisions'].to(dtype)))
     progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(dtype))
     # expansion
-    ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, three_to_two_classes(vocab_pdm_score['driving_direction_compliance'].to(dtype)))
+    ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, three_to_two_classes(
+        vocab_pdm_score['driving_direction_compliance'].to(dtype)))
     lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(dtype))
-    tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance, vocab_pdm_score['traffic_light_compliance'].to(dtype))
+    tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance,
+                                                 vocab_pdm_score['traffic_light_compliance'].to(dtype))
 
     vocab = predictions["trajectory_vocab"]
     # B, 8 (4 secs, 0.5Hz), 3
@@ -146,6 +151,7 @@ class HydraPlusAgent(AbstractAgent):
         self.model = HydraModel(config)
         self.vocab_size = config.vocab_size
         self.backbone_wd = config.backbone_wd
+        self.scheduler = config.scheduler
         if pdm_gt_path is not None:
             self.vocab_pdm_score_full = pickle.load(
                 open(f'{TRAJ_PDM_ROOT}/{pdm_gt_path}', 'rb'))
@@ -214,7 +220,20 @@ class HydraPlusAgent(AbstractAgent):
                 'weight_decay': self.backbone_wd
             }
         ]
-        return torch.optim.Adam(params_lr_dict, lr=self._lr)
+        if self.scheduler == 'default':
+            return torch.optim.Adam(params_lr_dict, lr=self._lr)
+        elif self.scheduler == 'cycle':
+            optim = torch.optim.Adam(params_lr_dict, lr=self._lr)
+            return {
+                "optimizer": optim,
+                "lr_scheduler": OneCycleLR(
+                    optim,
+                    max_lr=0.001,
+                    total_steps=20 * 196
+                )
+            }
+        else:
+            raise ValueError('Unsupported lr scheduler')
 
     def get_training_callbacks(self) -> List[pl.Callback]:
         return [

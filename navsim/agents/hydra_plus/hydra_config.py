@@ -13,6 +13,8 @@ NAVSIM_DEVKIT_ROOT = os.environ.get("NAVSIM_DEVKIT_ROOT")
 
 @dataclass
 class HydraConfig(TransfuserConfig):
+    scheduler: str = 'default'
+
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0
     trajectory_pdm_weight = {

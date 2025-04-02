@@ -1,7 +1,7 @@
 #!/bin/bash
 
-agent=hydra_plus
-dir=hydra_plus_v2ep
+agent=hydra_plus_cycle
+dir=hydra_plus_cycle
 bs=22
 nodes=3
 
@@ -11,8 +11,8 @@ submit_job \
     --account av_alpamayo_research \
     --nodes ${nodes} \
     -n "bash" \
-    --image /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/lzx-navsim.sqsh \
-    --logroot /lustre/fsw/portfolios/av/users/shiyil/zxli/navsim_workspace/slurm_logs \
+    --image /lustre/fsw/portfolios/av/users/zhenxinl/navsim_workspace/lzx-navsim.sqsh \
+    --logroot /lustre/fsw/portfolios/av/users/zhenxinl/navsim_workspace/slurm_logs \
     --email_mode never \
     --duration 4 \
     --dependent_clones 0 \
