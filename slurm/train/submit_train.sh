@@ -16,4 +16,5 @@ submit_job \
     --email_mode never \
     --duration 4 \
     --dependent_clones 2 \
+    --partition interactive \
     -c ". slurm/pre.sh; bash slurm/train/train_auto_fp32.sh ${agent} ${dir} ${bs}"
