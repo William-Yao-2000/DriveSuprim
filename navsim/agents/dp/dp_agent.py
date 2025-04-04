@@ -130,7 +130,7 @@ class DPAgent(AbstractAgent):
                 "lr_scheduler": OneCycleLR(
                     optim,
                     max_lr=0.001,
-                    total_steps=20 * 196
+                    total_steps=100 * 202
                 )
             }
         else:
