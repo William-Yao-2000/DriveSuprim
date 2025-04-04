@@ -1,9 +1,15 @@
 #!/bin/bash
 
-agent=hydra_plus_cycle
-dir=hydra_plus_cycle
-bs=22
-nodes=3
+#agent=hydra_plus_cycle
+#dir=hydra_plus_cycle
+#bs=22
+#nodes=3
+
+agent=dp
+dir=dp
+bs=64
+nodes=2
+
 
 submit_job \
     --gpu 8 \
@@ -17,4 +23,4 @@ submit_job \
     --duration 4 \
     --dependent_clones 2 \
     --partition interactive \
-    -c ". slurm/pre.sh; bash slurm/train/train_auto_fp32.sh ${agent} ${dir} ${bs}"
+    -c ". slurm/pre.sh; bash slurm/train/train_dp.sh ${agent} ${dir} ${bs}"
