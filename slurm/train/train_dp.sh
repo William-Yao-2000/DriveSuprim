@@ -7,7 +7,7 @@ dir=$2
 # 3nodes, bs=22
 bs=$3
 lr=0.0002
-max_epochs=200
+max_epochs=100
 
 config="competition_training"
 ckpt_dir="${NAVSIM_EXP_ROOT}/${dir}"

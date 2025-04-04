@@ -7,7 +7,7 @@
 
 agent=dp
 dir=dp
-bs=64
+bs=32
 nodes=2
 
 
