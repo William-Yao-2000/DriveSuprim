@@ -169,11 +169,6 @@ class SimpleDiffusionTransformer(nn.Module):
 class DPModel(nn.Module):
     def __init__(self, config: DPConfig):
         super().__init__()
-
-        self._query_splits = [
-            config.num_bounding_boxes,
-        ]
-
         self._config = config
         assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet', 'eva', 'moe', 'moe_ult32', 'swin']
         if config.backbone_type == 'eva':
@@ -184,9 +179,8 @@ class DPModel(nn.Module):
 
         img_num = 2 if config.use_back_view else 1
         self._keyval_embedding = nn.Embedding(
-            config.img_vert_anchors * config.img_horz_anchors * img_num, config.tf_d_model
+            config.img_vert_anchors * config.img_horz_anchors * img_num + 1, config.tf_d_model
         )  # 8x8 feature grid + trajectory
-        self._query_embedding = nn.Embedding(sum(self._query_splits), config.tf_d_model)
 
         # usually, the BEV features are variable in size.
         self.downscale_layer = nn.Conv2d(self._backbone.img_feat_c, config.tf_d_model, kernel_size=1)
@@ -246,11 +240,11 @@ class DPModel(nn.Module):
             status_encoding = self._status_encoding(status_feature)
 
         keyval = video_feats
-
+        keyval = torch.concatenate([keyval, status_encoding[:, None]], dim=1)
         keyval += self._keyval_embedding.weight[None, ...]
 
         output: Dict[str, torch.Tensor] = {}
-        trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj)
+        trajectory = self._trajectory_head(keyval)
 
         output.update(trajectory)
         output['env_kv'] = keyval
@@ -277,19 +271,18 @@ class DPHead(nn.Module):
         self.transformer_dp = SimpleDiffusionTransformer(
             d_model, nhead, d_ffn, 5,
             input_dim=8 * 3,
-            obs_len=config.img_vert_anchors * config.img_horz_anchors * img_num,
+            obs_len=config.img_vert_anchors * config.img_horz_anchors * img_num + 1,
         )
         self.num_inference_steps = self.noise_scheduler.config.num_train_timesteps
 
-
-    def forward(self, bev_feature, status_encoding, interpolated_traj=None) -> Dict[str, torch.Tensor]:
-        B = bev_feature.shape[0]
+    def forward(self, kv) -> Dict[str, torch.Tensor]:
+        B = kv.shape[0]
         result = {}
         if not self.training:
             dp_preds = []
             for batch_idx in range(B):
                 NUM_PROPOSALS = 10
-                condition = bev_feature[batch_idx][None].repeat(NUM_PROPOSALS, 1, 1)
+                condition = kv[batch_idx][None].repeat(NUM_PROPOSALS, 1, 1)
                 noise = torch.randn(
                     size=(NUM_PROPOSALS, 8, 3),
                     dtype=condition.dtype,
@@ -317,10 +310,10 @@ class DPHead(nn.Module):
             result['dp_pred'] = torch.cat(dp_preds, 0)
         return result
 
-    def get_dp_loss(self, bev_feature, gt_trajectory):
+    def get_dp_loss(self, kv, gt_trajectory):
         # command_states: [B 40 2]
-        B = bev_feature.shape[0]
-        device = bev_feature.device
+        B = kv.shape[0]
+        device = kv.device
         gt_trajectory = gt_trajectory.float()
         gt_trajectory = diff_traj(gt_trajectory)
 
@@ -340,6 +333,6 @@ class DPHead(nn.Module):
         pred = self.transformer_dp(
             noisy_dp_input,
             timesteps,
-            bev_feature
+            kv
         )
         return F.mse_loss(pred, noise)

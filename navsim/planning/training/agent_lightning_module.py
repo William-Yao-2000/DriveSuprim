@@ -89,7 +89,6 @@ class AgentLightningModule(pl.LightningModule):
         with torch.no_grad():
             predictions = self.agent.forward(features)
             poses = predictions["dp_pred"].cpu().numpy()
-            print(poses.shape)
             poses = poses[:, 0]
 
         if poses.shape[1] == 40:
