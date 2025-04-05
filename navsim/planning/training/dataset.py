@@ -130,7 +130,7 @@ class CacheOnlyDataset(torch.utils.data.Dataset):
             data_dict = load_feature_target_from_pickle(data_dict_path)
             targets.update(data_dict)
 
-        return (features, targets)
+        return (features, targets, token)
 
 
 class Dataset(torch.utils.data.Dataset):
