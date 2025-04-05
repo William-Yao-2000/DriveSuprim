@@ -24,4 +24,4 @@ submit_job \
     --duration 4 \
     --dependent_clones 2 \
     --partition interactive \
-    -c ". slurm/pre_shiyi.sh; bash slurm/train/train_auto_fp32.sh ${agent} ${dir} ${bs} ${epochs}"
+    -c ". slurm/pre_shiyi.sh; bash slurm/train/train_dp.sh ${agent} ${dir} ${bs} ${epochs}"
