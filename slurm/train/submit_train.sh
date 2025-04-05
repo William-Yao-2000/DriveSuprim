@@ -17,7 +17,7 @@ submit_job \
     --tasks_per_node 8 \
     --account av_research \
     --nodes ${nodes} \
-    -n "bash" \
+    -n ${dir} \
     --image /lustre/fsw/portfolios/av/users/zhenxinl/navsim_workspace/lzx-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/zhenxinl/navsim_workspace/slurm_logs \
     --email_mode never \
