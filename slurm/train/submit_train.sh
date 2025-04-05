@@ -22,5 +22,4 @@ submit_job \
     --email_mode never \
     --duration 4 \
     --dependent_clones 2 \
-    --partition interactive \
     -c ". slurm/pre.sh; bash slurm/train/train_dp.sh ${agent} ${dir} ${bs}"
