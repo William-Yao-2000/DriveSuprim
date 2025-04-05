@@ -1,6 +1,5 @@
-agent=dp
-res="2048x512"
-
+export agent=dp
+export res="2048x512"
 python navsim/planning/script/run_dataset_caching.py \
 --config-name competition_training \
 agent=${agent} \
