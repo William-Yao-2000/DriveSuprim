@@ -6,6 +6,8 @@ from nuplan.planning.simulation.trajectory.trajectory_sampling import Trajectory
 from torch import Tensor
 
 from navsim.agents.abstract_agent import AbstractAgent
+from navsim.agents.dp.dp_agent import DPAgent
+from navsim.agents.hydra_plus.hydra_plus_agent import HydraPlusAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
 from navsim.common.dataclasses import Trajectory
 
@@ -70,7 +72,37 @@ class AgentLightningModule(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
-        return self.predict_step_hydra(batch, batch_idx)
+        if isinstance(self.agent, HydraPlusAgent):
+            return self.predict_step_hydra(batch, batch_idx)
+        elif isinstance(self.agent, DPAgent):
+            return self.predict_step_dp(batch, batch_idx)
+        else:
+            raise ValueError('unsupported agent')
+
+    def predict_step_dp(
+            self,
+            batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
+            batch_idx: int
+    ):
+        features, targets, tokens = batch
+        self.agent.eval()
+        with torch.no_grad():
+            predictions = self.agent.forward(features)
+            poses = predictions["dp_pred"].cpu().numpy()
+            print(poses.shape)
+            poses = poses[:, 0]
+
+        if poses.shape[1] == 40:
+            interval_length = 0.1
+        else:
+            interval_length = 0.5
+
+        result = {}
+        for (pose, token) in zip(poses, tokens):
+            result[token] = {
+                'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
+            }
+        return result
 
     def predict_step_hydra(
             self,
@@ -87,7 +119,8 @@ class AgentLightningModule(pl.LightningModule):
             imis = predictions["imi"].softmax(-1).log().cpu().numpy()
             no_at_fault_collisions_all = predictions["no_at_fault_collisions"].sigmoid().log().cpu().numpy()
             drivable_area_compliance_all = predictions["drivable_area_compliance"].sigmoid().log().cpu().numpy()
-            time_to_collision_within_bound_all = predictions["time_to_collision_within_bound"].sigmoid().log().cpu().numpy()
+            time_to_collision_within_bound_all = predictions[
+                "time_to_collision_within_bound"].sigmoid().log().cpu().numpy()
             ego_progress_all = predictions["ego_progress"].sigmoid().log().cpu().numpy()
             driving_direction_compliance_all = predictions["driving_direction_compliance"].sigmoid().log().cpu().numpy()
             lane_keeping_all = predictions["lane_keeping"].sigmoid().log().cpu().numpy()
