@@ -4,12 +4,13 @@ agent=hydra_plus
 dir=hydra_plus_video
 bs=22
 nodes=3
+epochs=20
 
 #agent=dp
 #dir=dp_ctrl
 #bs=32
 #nodes=2
-
+#epochs=100
 
 submit_job \
     --gpu 8 \
@@ -23,4 +24,4 @@ submit_job \
     --duration 4 \
     --dependent_clones 2 \
     --partition interactive \
-    -c ". slurm/pre.sh; bash slurm/train/train_dp.sh ${agent} ${dir} ${bs}"
+    -c ". slurm/pre.sh; bash slurm/train/train_auto_fp32.sh ${agent} ${dir} ${bs} ${epochs}"
