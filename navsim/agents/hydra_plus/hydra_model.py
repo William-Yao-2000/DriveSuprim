@@ -179,6 +179,11 @@ class HydraTrajHead(nn.Module):
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
+            'history_comfort': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
             'imi': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
@@ -262,7 +267,8 @@ class HydraTrajHead(nn.Module):
                 0.2 * result['driving_direction_compliance'].sigmoid().log() +
                 6.0 * (7.0 * result['time_to_collision_within_bound'].sigmoid() +
                        7.0 * result['ego_progress'].sigmoid() +
-                       3.0 * result['lane_keeping'].sigmoid()).log()
+                       3.0 * result['lane_keeping'].sigmoid() +
+                       1.0 * result['history_comfort'].sigmoid()).log()
         )
 
         # baseline
