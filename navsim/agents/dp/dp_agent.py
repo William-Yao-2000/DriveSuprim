@@ -141,8 +141,8 @@ class DPAgent(AbstractAgent):
         return [
             # TransfuserCallback(self._config),
             ModelCheckpoint(
-                save_top_k=30,
-                monitor="val/loss_epoch",
+                save_top_k=-1,
+                monitor="train/loss_epoch",
                 mode="min",
                 dirpath=f"{os.environ.get('NAVSIM_EXP_ROOT')}/{self._config.ckpt_path}/",
                 filename="{epoch:02d}-{step:04d}",
