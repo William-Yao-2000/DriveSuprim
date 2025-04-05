@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from navsim.agents.dp.dp_model import TemporalAttention
 from navsim.agents.hydra_plus.hydra_backbone import HydraBackbone
 from navsim.agents.hydra_plus.hydra_config import HydraConfig
 from navsim.agents.transfuser.transfuser_model import AgentHead
@@ -61,6 +62,13 @@ class HydraModel(nn.Module):
             vocab_path=config.vocab_path,
             config=config
         )
+        self.temporal_fuse = TemporalAttention(embed_dims=config.tf_d_model)
+        self.temporal_fusion = nn.Sequential(
+            nn.Conv2d(self._config.seq_len * config.tf_d_model, config.tf_d_model * 4, kernel_size=3, stride=1,
+                      padding=1),
+            nn.ReLU(),
+            nn.Conv2d(config.tf_d_model * 4, config.tf_d_model, kernel_size=3, stride=1, padding=1),
+        )
 
     def img_feat_blc(self, camera_feature):
         img_features = self._backbone(camera_feature)
@@ -68,49 +76,52 @@ class HydraModel(nn.Module):
         img_features = img_features.permute(0, 2, 1)
         return img_features
 
+    def get_feats_1frame(self, camera_feature):
+        img_features = self._backbone(camera_feature)
+        img_features = self.downscale_layer(img_features)
+        return img_features
+
     def forward(self, features: Dict[str, torch.Tensor],
                 interpolated_traj=None) -> Dict[str, torch.Tensor]:
-        camera_feature = features["camera_feature"]
         status_feature: torch.Tensor = features["status_feature"][0]
-        if isinstance(camera_feature, list):
-            camera_feature = camera_feature[-1]
-
-        with torch.no_grad():
-
-            camera_feature_pre: torch.Tensor = features["camera_feature"][-2]
-            status_feature_pre: torch.Tensor = features["status_feature"][1]
-            if self._config.num_ego_status == 1 and status_feature_pre.shape[1] == 32:
-                status_encoding_pre = self._status_encoding(status_feature_pre[:, :8])
-            else:
-                status_encoding_pre = self._status_encoding(status_feature_pre)
-
-            img_features_pre = self._backbone(camera_feature_pre)
-            img_features_pre = self.downscale_layer(img_features_pre)
-
-            img_features_pre = img_features_pre.flatten(-2, -1)  # (B, self.embed_dims, H*W)
-            img_features_pre = img_features_pre.permute(0, 2, 1)  # (B, H*W, self.embed_dims)
-            keyval_pre = img_features_pre
-            keyval_pre += self._keyval_embedding.weight[None, ...]
-            trajectory_pre = self._trajectory_head(keyval_pre, status_encoding_pre, interpolated_traj)
-            trajectory_pre = trajectory_pre['trajectory']
-
-        img_features = self.img_feat_blc(camera_feature)
-        if self._config.use_back_view:
-            img_features_back = self.img_feat_blc(features["camera_feature_back"])
-            img_features = torch.cat([img_features, img_features_back], 1)
+        camera_feature = features["camera_feature"]
 
         if self._config.num_ego_status == 1 and status_feature.shape[1] == 32:
             status_encoding = self._status_encoding(status_feature[:, :8])
         else:
             status_encoding = self._status_encoding(status_feature)
 
-        keyval = img_features
+        # plus
+        batch_size = status_feature.shape[0]
+        assert (camera_feature[-1].shape[0] == batch_size)
+        video_feats = []
+        assert self._config.seq_len == 2
+        for frame_idx in range(self._config.seq_len):
+            feat = self.get_feats_1frame(camera_feature[frame_idx])
+            if frame_idx == 0:
+                feat = feat.detach()
+            video_feats.append(feat)
+        # temporal fusion
+        video_feats = torch.stack(video_feats, dim=1)
+        video_feats = self.temporal_fuse(video_feats)
+        video_feats = self.temporal_fusion(video_feats).flatten(-2, -1).permute(0, 2, 1)
+        keyval = video_feats
+
+        # original
+        # if isinstance(camera_feature, list):
+        #     camera_feature = camera_feature[-1]
+        # img_features = self.img_feat_blc(camera_feature)
+        # if self._config.use_back_view:
+        #     img_features_back = self.img_feat_blc(features["camera_feature_back"])
+        #     img_features = torch.cat([img_features, img_features_back], 1)
+        # keyval = img_features
+
+
         keyval += self._keyval_embedding.weight[None, ...]
 
         output: Dict[str, torch.Tensor] = {}
         trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj)
         output.update(trajectory)
-        output.update({"trajectory_pre": trajectory_pre})
         return output
 
 

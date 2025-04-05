@@ -34,7 +34,9 @@ run_train_from_scratch() {
             trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
-            cache_path=null
+            cache_path=${NAVSIM_EXP_ROOT}/navtrain_dp_img2048x512_cache \
+            use_cache_without_dataset=True \
+            force_cache_computation=False
     "
     echo "--- COMMAND ---"
     echo "$command_string"
@@ -69,7 +71,9 @@ resume_training() {
             trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
-            cache_path=null
+            cache_path=${NAVSIM_EXP_ROOT}/navtrain_dp_img2048x512_cache \
+            use_cache_without_dataset=True \
+            force_cache_computation=False
     "
     echo "--- COMMAND ---"
     echo "$command_string"
