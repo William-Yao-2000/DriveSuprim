@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#agent=hydra_plus
-#dir=hydra_plus_video
-#bs=22
-#nodes=3
+agent=hydra_plus
+dir=hydra_plus_video
+bs=22
+nodes=3
 
-agent=dp
-dir=dp_ctrl
-bs=32
-nodes=2
+#agent=dp
+#dir=dp_ctrl
+#bs=32
+#nodes=2
 
 
 submit_job \
