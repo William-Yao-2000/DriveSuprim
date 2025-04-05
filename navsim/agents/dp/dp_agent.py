@@ -35,7 +35,8 @@ def dp_loss(
 ):
     # B, 8 (4 secs, 0.5Hz), 3
     target_traj = targets["trajectory"]
-    dp_loss = traj_head.get_dp_loss(predictions['env_kv'], target_traj.float())
+    command_states = targets["command_states"]
+    dp_loss = traj_head.get_dp_loss(predictions['env_kv'], command_states.float())
     loss = (
         dp_loss
     )

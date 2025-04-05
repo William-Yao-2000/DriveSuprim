@@ -22,12 +22,18 @@ from navsim.common.dataclasses import AgentInput, Scene, Annotations
 from navsim.common.enums import BoundingBoxIndex
 from navsim.evaluate.pdm_score import transform_trajectory, get_trajectory_as_array
 from navsim.planning.scenario_builder.navsim_scenario_utils import tracked_object_types
+from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
 from navsim.planning.simulation.planner.pdm_planner.utils.pdm_enums import StateIndex
 from navsim.planning.training.abstract_feature_target_builder import (
     AbstractFeatureBuilder,
     AbstractTargetBuilder,
 )
 
+def state2traj(states):
+    rel_poses = absolute_to_relative_poses([StateSE2(*tmp) for tmp in
+                                            states[:, StateIndex.STATE_SE2]])
+    final_traj = [pose.serialize() for pose in rel_poses[1:]]
+    return final_traj
 
 class HydraFeatureBuilder(AbstractFeatureBuilder):
     def __init__(self, config: HydraConfig):
@@ -111,6 +117,9 @@ class HydraTargetBuilder(AbstractTargetBuilder):
     def __init__(self, config: HydraConfig):
         self._config = config
         self.v_params = get_pacifica_parameters()
+        self.simulator = PDMSimulator(
+            TrajectorySampling(num_poses=40, interval_length=0.1)
+        )
         # lidar_resolution_width = 256
         # lidar_resolution_height = 256
         # self.dense_layers: List[SemanticMapLayer] = [
@@ -174,17 +183,32 @@ class HydraTargetBuilder(AbstractTargetBuilder):
             TrajectorySampling(num_poses=40, interval_length=0.1),
             ego_state.time_point
         )
-        rel_poses = absolute_to_relative_poses([StateSE2(*tmp) for tmp in
-                                                interpolated_traj[:, StateIndex.STATE_SE2]])
-        # skip the curr frame
-        final_traj = [pose.serialize() for pose in rel_poses[1:]]
+        command_states = self.simulator.simulate_command_states(
+            interpolated_traj[None],
+            ego_state
+        )
+        # [40, 2]
+
+        recovered_states = self.simulator.command_states2waypoints(
+            command_states, ego_state
+        )
+
+        final_traj = state2traj(interpolated_traj)
         final_traj = torch.tensor(final_traj)
+
+        recovered_traj = state2traj(recovered_states.squeeze(0))
+        recovered_traj = torch.tensor(recovered_traj)
+
+        # print((final_traj-recovered_traj).abs().max())
+        command_states = torch.tensor(command_states)
+
         return {
             "trajectory": trajectory,
             "agent_states": agent_states,
             "agent_labels": agent_labels,
             "bev_semantic_map": bev_semantic_map,
-            "interpolated_traj": final_traj
+            "interpolated_traj": final_traj,
+            "command_states": command_states
         }
 
     def _compute_agent_targets(self, annotations: Annotations) -> Tuple[torch.Tensor, torch.Tensor]:

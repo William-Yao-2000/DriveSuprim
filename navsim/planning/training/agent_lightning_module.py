@@ -84,6 +84,7 @@ class AgentLightningModule(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
+        # todo kinematics -> trajectory
         features, targets, tokens = batch
         self.agent.eval()
         with torch.no_grad():

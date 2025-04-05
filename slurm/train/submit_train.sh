@@ -1,14 +1,14 @@
 #!/bin/bash
 
-agent=hydra_plus
-dir=hydra_plus_video
-bs=22
-nodes=3
+#agent=hydra_plus
+#dir=hydra_plus_video
+#bs=22
+#nodes=3
 
-#agent=dp
-#dir=dp
-#bs=32
-#nodes=2
+agent=dp
+dir=dp_ctrl
+bs=32
+nodes=2
 
 
 submit_job \
@@ -22,4 +22,5 @@ submit_job \
     --email_mode never \
     --duration 4 \
     --dependent_clones 2 \
+    --partition interactive \
     -c ". slurm/pre.sh; bash slurm/train/train_dp.sh ${agent} ${dir} ${bs}"

@@ -270,7 +270,7 @@ class DPHead(nn.Module):
 
         self.transformer_dp = SimpleDiffusionTransformer(
             d_model, nhead, d_ffn, 5,
-            input_dim=8 * 3,
+            input_dim=2 * 40,
             obs_len=config.img_vert_anchors * config.img_horz_anchors * img_num + 1,
         )
         self.num_inference_steps = self.noise_scheduler.config.num_train_timesteps
@@ -304,20 +304,20 @@ class DPHead(nn.Module):
                         model_output, t, noise,
                     ).prev_sample
                 # noise shape [10, 40, 2]
-                traj = cumsum_traj(noise)
-                dp_preds.append(traj[None])
+                # traj = cumsum_traj(noise)
+                dp_preds.append(noise[None])
             # B, 10, 40, 2
             result['dp_pred'] = torch.cat(dp_preds, 0)
         return result
 
-    def get_dp_loss(self, kv, gt_trajectory):
+    def get_dp_loss(self, kv, gt_command_states):
         # command_states: [B 40 2]
         B = kv.shape[0]
         device = kv.device
-        gt_trajectory = gt_trajectory.float()
-        gt_trajectory = diff_traj(gt_trajectory)
+        gt_command_states = gt_command_states.float()
+        # gt_trajectory = diff_traj(gt_trajectory)
 
-        noise = torch.randn(gt_trajectory.shape, device=device, dtype=torch.float)
+        noise = torch.randn(gt_command_states.shape, device=device, dtype=torch.float)
         # Sample a random timestep for each image
         timesteps = torch.randint(
             0, self.noise_scheduler.config.num_train_timesteps,
@@ -326,7 +326,7 @@ class DPHead(nn.Module):
         # Add noise to the clean images according to the noise magnitude at each timestep
         # (this is the forward diffusion process)
         noisy_dp_input = self.noise_scheduler.add_noise(
-            gt_trajectory, noise, timesteps
+            gt_command_states, noise, timesteps
         )
 
         # Predict the noise residual
