@@ -10,7 +10,7 @@ config:
   lidar_seq_len: 4
   sigma: 0.5
   trajectory_imi_weight: 1.0
-  scheduler: cycle
+#  scheduler: cycle
   progress_weight: 2.0
 
   normalize_vocab_pos: True
