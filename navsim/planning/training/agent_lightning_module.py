@@ -140,7 +140,7 @@ class AgentLightningModule(pl.LightningModule):
 
         device = features['ego_pose'].device
         result = {}
-        for (proposals, token) in zip(all_trajs, tokens):
+        for (proposals, control, token) in zip(all_trajs, controls, tokens):
             # todo use hydra to sample
             # pose = proposals[0]
             hydra_result = self.hydra_preds[token]
@@ -165,7 +165,8 @@ class AgentLightningModule(pl.LightningModule):
             pose = proposals[scores.argmax(0)]
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
-                'proposals': proposals
+                'proposals': proposals,
+                'controls': control
             }
 
         # debug
