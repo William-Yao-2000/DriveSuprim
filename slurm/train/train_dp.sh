@@ -12,6 +12,7 @@ lr=0.0002
 
 config="competition_training"
 ckpt_dir="${NAVSIM_EXP_ROOT}/${dir}"
+cache_root="/lustre/fsw/portfolios/av/users/zhenxinl/navsim_workspace/exp2"
 
 #export NCCL_DEBUG=INFO
 #export NCCL_DEBUG_SUBSYS=ALL
@@ -35,7 +36,7 @@ run_train_from_scratch() {
             trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
-            cache_path=${NAVSIM_EXP_ROOT}/navtrain_dp_img2048x512_cmd_cache \
+            cache_path=${cache_root}/navtrain_dp_img2048x512_cmd_cache \
             use_cache_without_dataset=True \
             force_cache_computation=False
     "
@@ -72,7 +73,7 @@ resume_training() {
             trainer.params.precision=32 \
             agent.config.ckpt_path=$dir \
             agent.lr=$lr \
-            cache_path=${NAVSIM_EXP_ROOT}/navtrain_dp_img2048x512_cmd_cache \
+            cache_path=${cache_root}/navtrain_dp_img2048x512_cmd_cache \
             use_cache_without_dataset=True \
             force_cache_computation=False
     "
