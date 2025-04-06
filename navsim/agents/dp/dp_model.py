@@ -266,7 +266,7 @@ class DPHead(nn.Module):
             beta_end=0.02,
             beta_schedule='squaredcos_cap_v2',
             variance_type='fixed_small',
-            clip_sample=True,
+            clip_sample=False,
             prediction_type='epsilon'
         )
         img_num = 2 if config.use_back_view else 1
