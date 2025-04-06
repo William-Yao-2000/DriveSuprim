@@ -140,6 +140,7 @@ class AgentLightningModule(pl.LightningModule):
             pose = proposals[0]
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
+                'proposals': proposals
             }
 
         # debug
