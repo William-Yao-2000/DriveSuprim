@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import LRScheduler, OneCycleLR
 
 from navsim.agents.dp.dp_config import DPConfig
 from navsim.agents.dp.dp_model import DPModel
+from navsim.agents.dp.dp_model_v2 import DPModel_v2
 from navsim.agents.hydra_plus.hydra_features import HydraFeatureBuilder, HydraTargetBuilder
 from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import (
@@ -24,7 +25,6 @@ from navsim.agents.abstract_agent import AbstractAgent
 from typing import Dict
 
 import torch
-import torch.nn.functional as F
 
 from navsim.agents.hydra_plus.hydra_config import HydraConfig
 
@@ -59,7 +59,12 @@ class DPAgent(AbstractAgent):
         self._config = config
         self._lr = lr
         self._checkpoint_path = checkpoint_path
-        self.model = DPModel(config)
+        if config.version == 'v1':
+            self.model = DPModel(config)
+        elif config.version == 'v2':
+            self.model = DPModel_v2(config)
+        else:
+            raise ValueError('unsupported version')
         self.backbone_wd = config.backbone_wd
         self.scheduler = config.scheduler
 

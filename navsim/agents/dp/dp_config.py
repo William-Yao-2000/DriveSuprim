@@ -14,6 +14,8 @@ NAVSIM_DEVKIT_ROOT = os.environ.get("NAVSIM_DEVKIT_ROOT")
 @dataclass
 class DPConfig(TransfuserConfig):
     scheduler: str = 'default'
+    dp_layers: int = 5
+    version: str = 'v1'
 
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0

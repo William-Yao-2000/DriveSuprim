@@ -21,16 +21,35 @@ class SimpleDiffusionTransformer(nn.Module):
         self.dp_transformer = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
                 d_model, nhead, d_ffn,
-                dropout=0.0, batch_first=True
+                activation='gelu',
+                norm_first=True,
+                dropout=0.0,
+                batch_first=True
             ), dp_nlayers
         )
         self.input_emb = nn.Linear(input_dim, d_model)
         self.time_emb = SinusoidalPosEmb(d_model)
         self.ln_f = nn.LayerNorm(d_model)
         self.output_emb = nn.Linear(d_model, input_dim)
-        token_len = obs_len + 1
-        self.cond_pos_emb = nn.Parameter(torch.zeros(1, token_len, d_model))
-        self.pos_emb = nn.Parameter(torch.zeros(1, 1, d_model))
+        kv_len = obs_len + 1
+
+        self.cond_pos_emb = nn.Parameter(torch.zeros(1, kv_len, d_model))
+        self.pos_emb = nn.Parameter(torch.zeros(1, HORIZON, d_model))
+
+        sz = HORIZON
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        self.register_buffer("mask", mask)
+
+        t, s = torch.meshgrid(
+            torch.arange(HORIZON),
+            torch.arange(kv_len),
+            indexing='ij'
+        )
+        mask = t >= (s - 1)  # add one dimension since time is the first token in cond
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        self.register_buffer('memory_mask', mask)
+
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
@@ -76,7 +95,7 @@ class SimpleDiffusionTransformer(nn.Module):
                 timestep,
                 cond):
         B, HORIZON, DIM = sample.shape
-        sample = sample.view(B, -1).float()
+        sample = sample.float()
         input_emb = self.input_emb(sample)
 
         timesteps = timestep
@@ -98,7 +117,7 @@ class SimpleDiffusionTransformer(nn.Module):
         # (B,T_cond,n_emb)
 
         # decoder
-        token_embeddings = input_emb.unsqueeze(1)
+        token_embeddings = input_emb
         t = token_embeddings.shape[1]
         position_embeddings = self.pos_emb[
                               :, :t, :
@@ -108,11 +127,14 @@ class SimpleDiffusionTransformer(nn.Module):
         x = self.dp_transformer(
             tgt=x,
             memory=memory,
+            tgt_mask=self.mask,
+            memory_mask=self.memory_mask
+
         )
         # (B,T,n_emb)
         x = self.ln_f(x)
         x = self.output_emb(x)
-        return x.squeeze(1).view(B, HORIZON, DIM)
+        return x
 
 
 class DPModel_v2(nn.Module):
@@ -208,8 +230,8 @@ class DPHead(nn.Module):
         img_num = 2 if config.use_back_view else 1
 
         self.transformer_dp = SimpleDiffusionTransformer(
-            d_model, nhead, d_ffn, 5,
-            input_dim=ACTION_DIM * HORIZON,
+            d_model, nhead, d_ffn, config.dp_layers,
+            input_dim=ACTION_DIM,
             obs_len=config.img_vert_anchors * config.img_horz_anchors * img_num + 1,
         )
         self.num_inference_steps = self.noise_scheduler.config.num_train_timesteps
