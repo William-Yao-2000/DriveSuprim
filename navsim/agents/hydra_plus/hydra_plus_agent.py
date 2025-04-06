@@ -74,8 +74,8 @@ def hydra_kd_imi_agent_loss(
     lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(dtype))
     tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance,
                                                  vocab_pdm_score['traffic_light_compliance'].to(dtype))
-    comfort_loss = F.binary_cross_entropy_with_logits(history_comfort,
-                                                      vocab_pdm_score['history_comfort'].to(dtype))
+    # comfort_loss = F.binary_cross_entropy_with_logits(history_comfort,
+    #                                                   vocab_pdm_score['history_comfort'].to(dtype))
     vocab = predictions["trajectory_vocab"]
     # B, 8 (4 secs, 0.5Hz), 3
     target_traj = targets["trajectory"]
@@ -102,7 +102,7 @@ def hydra_kd_imi_agent_loss(
     ddc_loss_final = config.trajectory_pdm_weight['driving_direction_compliance'] * ddc_loss
     lk_loss_final = config.trajectory_pdm_weight['lane_keeping'] * lk_loss
     tl_loss_final = config.trajectory_pdm_weight['traffic_light_compliance'] * tl_loss
-    comfort_loss_final = config.trajectory_pdm_weight['history_comfort'] * comfort_loss
+    # comfort_loss_final = config.trajectory_pdm_weight['history_comfort'] * comfort_loss
 
     loss = (
             imi_loss_final
@@ -113,7 +113,7 @@ def hydra_kd_imi_agent_loss(
             + ddc_loss_final
             + lk_loss_final
             + tl_loss_final
-            + comfort_loss_final
+            # + comfort_loss_final
     )
     return loss, {
         'imi_loss': imi_loss_final,
@@ -124,7 +124,7 @@ def hydra_kd_imi_agent_loss(
         'pdm_ddc_loss': ddc_loss_final,
         'pdm_lk_loss': lk_loss_final,
         'pdm_tl_loss': tl_loss_final,
-        'pdm_comfort_loss': comfort_loss_final
+        # 'pdm_comfort_loss': comfort_loss_final
     }
 
 

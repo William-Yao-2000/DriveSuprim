@@ -7,10 +7,18 @@ from torch import Tensor
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.dp.dp_agent import DPAgent
+from navsim.agents.hydra_plus.hydra_features import state2traj
 from navsim.agents.hydra_plus.hydra_plus_agent import HydraPlusAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
 from navsim.common.dataclasses import Trajectory
-
+from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
+from nuplan.common.actor_state.ego_state import EgoState
+from nuplan.common.actor_state.oriented_box import OrientedBox
+from nuplan.common.actor_state.state_representation import StateSE2, TimePoint, StateVector2D
+from nuplan.common.actor_state.tracked_objects_types import TrackedObjectType
+from nuplan.common.actor_state.vehicle_parameters import get_pacifica_parameters
+from nuplan.common.geometry.convert import absolute_to_relative_poses
+import numpy as np
 
 class AgentLightningModule(pl.LightningModule):
     """Pytorch lightning wrapper for learnable agent."""
@@ -22,6 +30,10 @@ class AgentLightningModule(pl.LightningModule):
         """
         super().__init__()
         self.agent = agent
+        self.simulator = PDMSimulator(
+            TrajectorySampling(num_poses=40, interval_length=0.1)
+        )
+        self.v_params = get_pacifica_parameters()
 
     def _step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], logging_prefix: str) -> Tensor:
         """
@@ -84,24 +96,57 @@ class AgentLightningModule(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
-        # todo kinematics -> trajectory
         features, targets, tokens = batch
         self.agent.eval()
         with torch.no_grad():
             predictions = self.agent.forward(features)
-            poses = predictions["dp_pred"].cpu().numpy()
-            poses = poses[:, 0]
+            # [B, PROPOSAL, HORIZON, 2]
+            controls = predictions["dp_pred"].cpu().numpy()
 
-        if poses.shape[1] == 40:
+        all_trajs = []
+        for batch_idx, command_states in enumerate(controls):
+            ego_state = EgoState.build_from_rear_axle(
+                StateSE2(*features['ego_pose'].cpu().numpy()[batch_idx]),
+                tire_steering_angle=0.0,
+                vehicle_parameters=self.v_params,
+                time_point=TimePoint(0),
+                rear_axle_velocity_2d=StateVector2D(
+                    *features['ego_velocity'].cpu().numpy()[batch_idx]
+                ),
+                rear_axle_acceleration_2d=StateVector2D(
+                    *features['ego_acceleration'].cpu().numpy()[batch_idx]
+                ),
+            )
+            traj_proposals = []
+            for command_state in command_states:
+                recovered_state = self.simulator.command_states2waypoints(
+                    command_state, ego_state
+                )
+                recovered_traj = state2traj(recovered_state.squeeze(0))
+                traj_proposals.append(recovered_traj)
+            all_trajs.append(np.array(traj_proposals))
+
+        # [B, PROPOSALS, HORIZON, 3]
+        all_trajs = np.array(all_trajs)
+
+        if all_trajs.shape[2] == 40:
             interval_length = 0.1
         else:
             interval_length = 0.5
 
         result = {}
-        for (pose, token) in zip(poses, tokens):
+        for (proposals, token) in zip(all_trajs, tokens):
+            # todo use hydra to sample
+            pose = proposals[0]
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
             }
+
+        # debug
+        # min_dist = ((((targets['interpolated_traj'][:, None] - torch.from_numpy(all_trajs).to(targets['interpolated_traj'].device))[..., :2]) ** 2)
+        #  .sum((-1,-2))
+        #  .min(1))
+
         return result
 
     def predict_step_hydra(

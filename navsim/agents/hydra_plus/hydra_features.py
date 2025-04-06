@@ -69,6 +69,9 @@ class HydraFeatureBuilder(AbstractFeatureBuilder):
         # 将列表中的张量堆叠成 [2, 3, N] 的形状
         features["status_feature"] = ego_status_list
 
+        features['ego_pose'] = agent_input.ego_statuses[-1].ego_pose
+        features['ego_velocity'] = agent_input.ego_statuses[-1].ego_velocity
+        features['ego_acceleration'] = agent_input.ego_statuses[-1].ego_acceleration
         return features
 
     def _get_camera_feature(self, agent_input: AgentInput) -> torch.Tensor:
@@ -120,31 +123,6 @@ class HydraTargetBuilder(AbstractTargetBuilder):
         self.simulator = PDMSimulator(
             TrajectorySampling(num_poses=40, interval_length=0.1)
         )
-        # lidar_resolution_width = 256
-        # lidar_resolution_height = 256
-        # self.dense_layers: List[SemanticMapLayer] = [
-        #     SemanticMapLayer.DRIVABLE_AREA,
-        #     SemanticMapLayer.CROSSWALK
-        # ]
-        # self.dense_layers_labels = [
-        #     1, 2
-        # ]
-
-        # self.discrete_layers: List[SemanticMapLayer] = [
-        #     SemanticMapLayer.LANE,
-        #     SemanticMapLayer.LANE_CONNECTOR,
-        # ]
-
-        # self.radius = 32.0
-        # self.bev_pixel_width: int = lidar_resolution_width
-        # self.bev_pixel_height: int = lidar_resolution_height
-        # self.bev_pixel_size: float = 0.25
-        # self.bev_semantic_frame = (self.bev_pixel_height, self.bev_pixel_width)
-        # self.padding_value = -10000
-        # self.sample_dist = 1
-        # self.num_samples = 250
-        # self.padding = False
-        # self.fixed_num = 20
 
     def get_unique_name(self) -> str:
         """Inherited, see superclass."""

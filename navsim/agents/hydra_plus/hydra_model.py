@@ -62,13 +62,13 @@ class HydraModel(nn.Module):
             vocab_path=config.vocab_path,
             config=config
         )
-        self.temporal_fuse = TemporalAttention(embed_dims=config.tf_d_model)
-        self.temporal_fusion = nn.Sequential(
-            nn.Conv2d(self._config.seq_len * config.tf_d_model, config.tf_d_model * 4, kernel_size=3, stride=1,
-                      padding=1),
-            nn.ReLU(),
-            nn.Conv2d(config.tf_d_model * 4, config.tf_d_model, kernel_size=3, stride=1, padding=1),
-        )
+        # self.temporal_fuse = TemporalAttention(embed_dims=config.tf_d_model)
+        # self.temporal_fusion = nn.Sequential(
+        #     nn.Conv2d(self._config.seq_len * config.tf_d_model, config.tf_d_model * 4, kernel_size=3, stride=1,
+        #               padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv2d(config.tf_d_model * 4, config.tf_d_model, kernel_size=3, stride=1, padding=1),
+        # )
 
     def img_feat_blc(self, camera_feature):
         img_features = self._backbone(camera_feature)
@@ -92,30 +92,29 @@ class HydraModel(nn.Module):
             status_encoding = self._status_encoding(status_feature)
 
         # plus
-        batch_size = status_feature.shape[0]
-        assert (camera_feature[-1].shape[0] == batch_size)
-        video_feats = []
-        assert self._config.seq_len == 2
-        for frame_idx in range(self._config.seq_len):
-            feat = self.get_feats_1frame(camera_feature[frame_idx])
-            if frame_idx == 0:
-                feat = feat.detach()
-            video_feats.append(feat)
-        # temporal fusion
-        video_feats = torch.stack(video_feats, dim=1)
-        video_feats = self.temporal_fuse(video_feats)
-        video_feats = self.temporal_fusion(video_feats).flatten(-2, -1).permute(0, 2, 1)
-        keyval = video_feats
+        # batch_size = status_feature.shape[0]
+        # assert (camera_feature[-1].shape[0] == batch_size)
+        # video_feats = []
+        # assert self._config.seq_len == 2
+        # for frame_idx in range(self._config.seq_len):
+        #     feat = self.get_feats_1frame(camera_feature[frame_idx])
+        #     if frame_idx == 0:
+        #         feat = feat.detach()
+        #     video_feats.append(feat)
+        # # temporal fusion
+        # video_feats = torch.stack(video_feats, dim=1)
+        # video_feats = self.temporal_fuse(video_feats)
+        # video_feats = self.temporal_fusion(video_feats).flatten(-2, -1).permute(0, 2, 1)
+        # keyval = video_feats
 
         # original
-        # if isinstance(camera_feature, list):
-        #     camera_feature = camera_feature[-1]
-        # img_features = self.img_feat_blc(camera_feature)
-        # if self._config.use_back_view:
-        #     img_features_back = self.img_feat_blc(features["camera_feature_back"])
-        #     img_features = torch.cat([img_features, img_features_back], 1)
-        # keyval = img_features
-
+        if isinstance(camera_feature, list):
+            camera_feature = camera_feature[-1]
+        img_features = self.img_feat_blc(camera_feature)
+        if self._config.use_back_view:
+            img_features_back = self.img_feat_blc(features["camera_feature_back"])
+            img_features = torch.cat([img_features, img_features_back], 1)
+        keyval = img_features
 
         keyval += self._keyval_embedding.weight[None, ...]
 
@@ -179,11 +178,11 @@ class HydraTrajHead(nn.Module):
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'history_comfort': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
+            # 'history_comfort': nn.Sequential(
+            #     nn.Linear(d_model, d_ffn),
+            #     nn.ReLU(),
+            #     nn.Linear(d_ffn, 1),
+            # ),
             'imi': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
@@ -267,8 +266,9 @@ class HydraTrajHead(nn.Module):
                 0.2 * result['driving_direction_compliance'].sigmoid().log() +
                 6.0 * (7.0 * result['time_to_collision_within_bound'].sigmoid() +
                        7.0 * result['ego_progress'].sigmoid() +
-                       3.0 * result['lane_keeping'].sigmoid() +
-                       1.0 * result['history_comfort'].sigmoid()).log()
+                       3.0 * result['lane_keeping'].sigmoid()
+                       # 1.0 * result['history_comfort'].sigmoid()
+                       ).log()
         )
 
         # baseline
