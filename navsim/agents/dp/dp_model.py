@@ -284,7 +284,7 @@ class DPHead(nn.Module):
         if not self.training:
             dp_preds = []
             for batch_idx in range(B):
-                NUM_PROPOSALS = 10
+                NUM_PROPOSALS = 100
                 condition = kv[batch_idx][None].repeat(NUM_PROPOSALS, 1, 1)
                 noise = torch.randn(
                     size=(NUM_PROPOSALS, HORIZON, ACTION_DIM),

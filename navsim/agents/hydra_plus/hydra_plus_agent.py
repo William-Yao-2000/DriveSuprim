@@ -57,7 +57,7 @@ def hydra_kd_imi_agent_loss(
         predictions['lane_keeping'],
         predictions['traffic_light_compliance']
     )
-    history_comfort = predictions['history_comfort']
+    # history_comfort = predictions['history_comfort']
     imi = predictions['imi']
     dtype = imi.dtype
     # 2 cls

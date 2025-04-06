@@ -1,7 +1,13 @@
+import os
+import pickle
 from typing import Dict, Tuple
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
+from nuplan.common.actor_state.ego_state import EgoState
+from nuplan.common.actor_state.state_representation import StateSE2, TimePoint, StateVector2D
+from nuplan.common.actor_state.vehicle_parameters import get_pacifica_parameters
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
 from torch import Tensor
 
@@ -12,13 +18,7 @@ from navsim.agents.hydra_plus.hydra_plus_agent import HydraPlusAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
 from navsim.common.dataclasses import Trajectory
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
-from nuplan.common.actor_state.ego_state import EgoState
-from nuplan.common.actor_state.oriented_box import OrientedBox
-from nuplan.common.actor_state.state_representation import StateSE2, TimePoint, StateVector2D
-from nuplan.common.actor_state.tracked_objects_types import TrackedObjectType
-from nuplan.common.actor_state.vehicle_parameters import get_pacifica_parameters
-from nuplan.common.geometry.convert import absolute_to_relative_poses
-import numpy as np
+
 
 class AgentLightningModule(pl.LightningModule):
     """Pytorch lightning wrapper for learnable agent."""
@@ -34,6 +34,10 @@ class AgentLightningModule(pl.LightningModule):
             TrajectorySampling(num_poses=40, interval_length=0.1)
         )
         self.v_params = get_pacifica_parameters()
+        self.hydra_preds = pickle.load(open(f'{os.getenv("NAVSIM_EXP_ROOT")}/hydra_plus_v2ep/epoch19.pkl', 'rb'))
+        self.vocab = torch.from_numpy(
+            np.load(f'{os.getenv("NAVSIM_DEVKIT_ROOT")}/traj_final/test_16384_rearaxle_kmeans.npy')
+        )
 
     def _step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], logging_prefix: str) -> Tensor:
         """
@@ -134,10 +138,31 @@ class AgentLightningModule(pl.LightningModule):
         else:
             interval_length = 0.5
 
+        device = features['ego_pose'].device
         result = {}
         for (proposals, token) in zip(all_trajs, tokens):
             # todo use hydra to sample
-            pose = proposals[0]
+            # pose = proposals[0]
+            hydra_result = self.hydra_preds[token]
+
+            proposals_ = torch.from_numpy(proposals).to(device)
+            vocab_ = self.vocab.to(device)
+            dist = ((proposals_.unsqueeze(1) - vocab_.unsqueeze(0)) ** 2).sum((-1, -2))
+            dist_argmin = dist.argmin(1).cpu().numpy()
+
+            scores = (
+                    0.5 * hydra_result['no_at_fault_collisions'][dist_argmin] +
+                    0.5 * hydra_result['traffic_light_compliance'][dist_argmin] +
+                    0.5 * hydra_result['drivable_area_compliance'][dist_argmin] +
+                    0.5 * hydra_result['driving_direction_compliance'][dist_argmin] +
+                    8.0 * np.log(
+                5.0 * np.exp(hydra_result['time_to_collision_within_bound'][dist_argmin]) +
+                5.0 * np.exp(hydra_result['ego_progress'][dist_argmin]) +
+                2.0 * np.exp(hydra_result['lane_keeping'][dist_argmin])
+            )
+            )
+
+            pose = proposals[scores.argmax(0)]
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
                 'proposals': proposals
@@ -155,7 +180,6 @@ class AgentLightningModule(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
-        # todo inference
         features, targets, tokens = batch
         self.agent.eval()
         with torch.no_grad():
