@@ -85,27 +85,18 @@ def main() -> None:
     # progress_weights = [5.0]
     # comfort_weights = [2.0]
 
-    imi_weights = [0.01, 0.02, 0.03, 0.04, 0.05]
-    noc_weights = [0.1]
-    da_weights = [0.5, 0.6, 0.7, 0.8, 0.9]
+    imi_weights = [0.02, 0.03, 0.04]
+    noc_weights = [0.01, 0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+    da_weights = [0.01, 0.05, 0.1, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
     dd_weights = [0.2]
     tl_weights = [0.1]
-    tpc_weights = [6.0, 7.0, 8.0, 9.0, 10.0]
-    ttc_weights = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    progress_weights = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    lk_weights = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    comfort_weights = [1.0, 2.0, 3.0, 4.0]
+    tpc_weights = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+    ttc_weights = [3.0]
+    progress_weights = [6.0]
+    lk_weights = [2.0]
+    comfort_weights = [2.0]
 
-    # imi_weights = [0.01]
-    # noc_weights = [0.01]
-    # da_weights = [0.01]
-    # tpc_weights = [3.5]
-    # ttc_weights = [7.0]
-    # progress_weights = [4.0]
-    # comfort_weights = [1.0]
-    # tl_weights = [6.0]
-    # lk_weights = [3.0]
-    # dd_weights = [0.075]
+
     print(
         f'Search space: {len(imi_weights) * len(noc_weights) * len(da_weights) * len(tpc_weights) * len(ttc_weights) * len(progress_weights) * len(comfort_weights)}')
 
