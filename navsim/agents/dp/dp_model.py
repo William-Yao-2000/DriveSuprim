@@ -28,6 +28,9 @@ def cumsum_traj(traj_diff):
     return torch.cat([traj, heading], -1)
 
 
+HORIZON = 40
+ACTION_DIM = 2
+
 class TemporalAttention(nn.Module):
     def __init__(self, embed_dims):
         super(TemporalAttention, self).__init__()
@@ -270,7 +273,7 @@ class DPHead(nn.Module):
 
         self.transformer_dp = SimpleDiffusionTransformer(
             d_model, nhead, d_ffn, 5,
-            input_dim=2 * 40,
+            input_dim=ACTION_DIM * HORIZON,
             obs_len=config.img_vert_anchors * config.img_horz_anchors * img_num + 1,
         )
         self.num_inference_steps = self.noise_scheduler.config.num_train_timesteps
@@ -284,7 +287,7 @@ class DPHead(nn.Module):
                 NUM_PROPOSALS = 10
                 condition = kv[batch_idx][None].repeat(NUM_PROPOSALS, 1, 1)
                 noise = torch.randn(
-                    size=(NUM_PROPOSALS, 8, 3),
+                    size=(NUM_PROPOSALS, HORIZON, ACTION_DIM),
                     dtype=condition.dtype,
                     device=condition.device,
                 )
