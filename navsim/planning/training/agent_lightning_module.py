@@ -161,6 +161,11 @@ class AgentLightningModule(pl.LightningModule):
                 2.0 * np.exp(hydra_result['lane_keeping'][dist_argmin])
             )
             )
+            # prevent from going backwards:
+            # 1. the overall trajectory goes backwards for 2m
+            # 2. the trajectory starts from x < -0.5m
+            backward_mask = (proposals_[..., 0] < -2.0).any(1).logical_and(proposals_[..., 0, 0] < -0.5)
+            scores[backward_mask.cpu().numpy()] -= 100.0
 
             pose = proposals[scores.argmax(0)]
             result[token] = {
