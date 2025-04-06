@@ -85,7 +85,7 @@ def main() -> None:
     # progress_weights = [5.0]
     # comfort_weights = [2.0]
 
-    imi_weights = [0.02, 0.03, 0.04]
+    imi_weights = [0.01, 0.02, 0.03, 0.04, 0.05]
     noc_weights = [0.1]
     da_weights = [0.5, 0.6, 0.7, 0.8, 0.9]
     dd_weights = [0.2]
@@ -94,8 +94,7 @@ def main() -> None:
     ttc_weights = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     progress_weights = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     lk_weights = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-
-    comfort_weights = [1.0]
+    comfort_weights = [1.0, 2.0, 3.0, 4.0]
 
     # imi_weights = [0.01]
     # noc_weights = [0.01]
@@ -134,7 +133,7 @@ def main() -> None:
         dd_scores.append(torch.from_numpy(gt_score['driving_direction_compliance'][None]).cuda())
         ttc_scores.append(torch.from_numpy(gt_score['time_to_collision_within_bound'][None]).cuda())
         progress_scores.append(torch.from_numpy(gt_score['ego_progress'][None]).cuda())
-        # comfort_scores.append(torch.from_numpy(merged_predictions[k]['history_comfort'][None]).cuda())
+        comfort_scores.append(torch.from_numpy(merged_predictions[k]['history_comfort'][None]).cuda())
         lk_scores.append(torch.from_numpy(gt_score['lane_keeping'][None]).cuda())
         tl_scores.append(torch.from_numpy(gt_score['traffic_light_compliance'][None]).cuda())
         old_pdm_scores.append(torch.from_numpy(aggregate_old_pdms(
@@ -146,7 +145,7 @@ def main() -> None:
         da_preds.append(torch.from_numpy(merged_predictions[k]['drivable_area_compliance'][None]).cuda())
         ttc_preds.append(torch.from_numpy(merged_predictions[k]['time_to_collision_within_bound'][None]).cuda())
         progress_preds.append(torch.from_numpy(merged_predictions[k]['ego_progress'][None]).cuda())
-        # comfort_preds.append(torch.from_numpy(merged_predictions[k]['history_comfort'][None]).cuda())
+        comfort_preds.append(torch.from_numpy(merged_predictions[k]['history_comfort'][None]).cuda())
         lk_preds.append(torch.from_numpy(merged_predictions[k]['lane_keeping'][None]).cuda())
         tl_preds.append(torch.from_numpy(merged_predictions[k]['traffic_light_compliance'][None]).cuda())
         dd_preds.append(torch.from_numpy(merged_predictions[k]['driving_direction_compliance'][None]).cuda())
@@ -158,7 +157,7 @@ def main() -> None:
     da_scores = torch.cat(da_scores, 0).contiguous()
     ttc_scores = torch.cat(ttc_scores, 0).contiguous()
     progress_scores = torch.cat(progress_scores, 0).contiguous()
-    # comfort_scores = torch.cat(comfort_scores, 0).contiguous()
+    comfort_scores = torch.cat(comfort_scores, 0).contiguous()
     lk_scores = torch.cat(lk_scores, 0).contiguous()
     tl_scores = torch.cat(tl_scores, 0).contiguous()
     dd_scores = torch.cat(dd_scores, 0).contiguous()
@@ -168,7 +167,7 @@ def main() -> None:
     da_preds = torch.cat(da_preds, 0).contiguous()
     ttc_preds = torch.cat(ttc_preds, 0).contiguous()
     progress_preds = torch.cat(progress_preds, 0).contiguous()
-    # comfort_preds = torch.cat(comfort_preds, 0).contiguous()
+    comfort_preds = torch.cat(comfort_preds, 0).contiguous()
     lk_preds = torch.cat(lk_preds, 0).contiguous()
     tl_preds = torch.cat(tl_preds, 0).contiguous()
     dd_preds = torch.cat(dd_preds, 0).contiguous()
@@ -196,7 +195,7 @@ def main() -> None:
                                                     tl_weight * tl_preds +
                                                     tpc_weight * (
                                                             ttc_weight * torch.exp(ttc_preds) +
-                                                            # comfort_weight * torch.exp(comfort_preds) +
+                                                            comfort_weight * torch.exp(comfort_preds) +
                                                             progress_weight * torch.exp(progress_preds) +
                                                             lk_weight * torch.exp(lk_preds)
                                                     ).log()
@@ -231,10 +230,10 @@ def main() -> None:
                                                 scene_cnt_tensor,
                                                 chosen_idx
                                             ]
-                                            # comfort_score = comfort_scores[
-                                            #     scene_cnt_tensor,
-                                            #     chosen_idx
-                                            # ]
+                                            comfort_score = comfort_scores[
+                                                scene_cnt_tensor,
+                                                chosen_idx
+                                            ]
                                             lk_score = lk_scores[
                                                 scene_cnt_tensor,
                                                 chosen_idx
@@ -253,7 +252,7 @@ def main() -> None:
                                             tl_score = tl_score.float().mean().item()
                                             ttc_score = ttc_score.float().mean().item()
                                             progress_score = progress_score.float().mean().item()
-                                            # comfort_score = comfort_score.float().mean().item()
+                                            comfort_score = comfort_score.float().mean().item()
 
                                             if pdm_score > highest_info['pdms']:
                                                 highest_info['pdms'] = pdm_score
@@ -265,7 +264,7 @@ def main() -> None:
                                                 highest_info['lane_keeping'] = lk_score
                                                 highest_info['traffic_light_compliance'] = tl_score
                                                 highest_info['ego_progress'] = progress_score
-                                                # highest_info['history_comfort'] = comfort_score
+                                                highest_info['history_comfort'] = comfort_score
                                                 highest_info['imi_weight'] = imi_weight
                                                 highest_info['noc_weight'] = noc_weight
                                                 highest_info['da_weight'] = da_weight
