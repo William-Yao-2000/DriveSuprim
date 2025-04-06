@@ -165,6 +165,7 @@ class HydraTargetBuilder(AbstractTargetBuilder):
             interpolated_traj[None],
             ego_state
         )
+        # print(command_states.max().item(), command_states.min().item())
         # [40, 2]
 
         recovered_states = self.simulator.command_states2waypoints(
