@@ -125,6 +125,7 @@ class AgentLightningModule(pl.LightningModule):
             driving_direction_compliance_all = predictions["driving_direction_compliance"].sigmoid().log().cpu().numpy()
             lane_keeping_all = predictions["lane_keeping"].sigmoid().log().cpu().numpy()
             traffic_light_compliance_all = predictions["traffic_light_compliance"].sigmoid().log().cpu().numpy()
+            history_comfort_all = predictions["history_comfort"].sigmoid().log().cpu().numpy()
 
         if poses.shape[1] == 40:
             interval_length = 0.1
@@ -141,6 +142,7 @@ class AgentLightningModule(pl.LightningModule):
              driving_direction_compliance,
              lane_keeping,
              traffic_light_compliance,
+             history_comfort,
              token) in \
                 zip(poses,
                     imis,
@@ -151,6 +153,7 @@ class AgentLightningModule(pl.LightningModule):
                     driving_direction_compliance_all,
                     lane_keeping_all,
                     traffic_light_compliance_all,
+                    history_comfort_all,
                     tokens):
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
@@ -162,5 +165,6 @@ class AgentLightningModule(pl.LightningModule):
                 'driving_direction_compliance': driving_direction_compliance,
                 'lane_keeping': lane_keeping,
                 'traffic_light_compliance': traffic_light_compliance,
+                'history_comfort': history_comfort
             }
         return result
