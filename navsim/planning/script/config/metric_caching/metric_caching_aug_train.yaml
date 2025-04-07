@@ -1,0 +1,26 @@
+hydra:
+  run:
+    dir: ${output_dir}
+  output_subdir: ${output_dir}/code/hydra           # Store hydra's config breakdown here for debugging
+  searchpath:                                       # Only <exp_dir> in these paths are discoverable
+    - pkg://navsim.planning.script.config.common
+  job:
+    chdir: False
+
+defaults:
+  - default_common
+  - default_dataset_paths
+  - _self_
+
+metric_cache_path: ${oc.env:NAVSIM_EXP_ROOT}/metric_cache  
+     
+force_feature_computation: True
+
+aug_train:
+  translation: 0
+  rotation: 30.0  # degree, positive: turn left
+  va: 0  # vel and accs
+
+offline_aug_file: null
+
+output_dir: ${metric_cache_path}/metadata
