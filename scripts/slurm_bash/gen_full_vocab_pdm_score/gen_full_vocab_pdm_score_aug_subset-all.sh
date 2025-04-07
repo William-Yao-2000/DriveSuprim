@@ -1,8 +1,7 @@
 #!/bin/bash
-cd /lustre/fsw/portfolios/av/users/shiyil/yaowenh/proj/navsim_workspace/robust_navsim
-git pull
+seed=$1
 
-for idx in $(seq 1 32)
+for idx in $(seq 1 1)
 do
     submit_job \
         --gpu 1 \
@@ -14,6 +13,8 @@ do
         --email_mode never \
         --duration 4 \
         --dependent_clones 0 \
-        -c "bash scripts/slurm_bash/gen_full_vocab_pdm_score/gen_full_vocab_pdm_score_aug_subset.sh navtrain_new_sub$idx"
+        --account av_research \
+        -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; \
+        bash scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_sub$idx $seed"
     sleep 3
 done

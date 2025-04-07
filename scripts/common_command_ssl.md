@@ -287,13 +287,12 @@ python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=n
 
 bash command (subset score generation)
 ```bash
-sh scripts/robust/gen_full_score_aug/gen_training_full_score_aug_subset.sh navtrain_sub???
-
-sh scripts/robust/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_sub???
+sh scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_sub???
 ```
 
 debug
 ```bash
+export PROGRESS_MODE=gen_gt; \
 python navsim/agents/tools/gen_vocab_full_score_aug_train.py train_test_split=navtrain_debug \
     +debug=true \
     +vocab_size=8192 \
@@ -309,27 +308,29 @@ python navsim/agents/tools/gen_vocab_full_score_aug_train.py train_test_split=na
 
 debug (not debug mode)
 ```bash
+export PROGRESS_MODE=gen_gt; \
 python navsim/agents/tools/gen_vocab_full_score_aug_train.py train_test_split=navtrain_debug \
     +debug=false \
     +vocab_size=8192 \
     +scene_filter_name=navtrain_debug \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/debug \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/debug/train/random_aug/rot_30-trans_0-va_0-p_0.5-seed_2024 \
     worker.threads_per_node=128 \
     aug_train.rotation=30 \
-    aug_train.seed=2026 \
+    aug_train.seed=2024 \
     experiment_name=debug
 ```
 
 ori debug (not debug mode)
 ```bash
-python navsim/agents/scripts/gen_vocab_full_score.py split=trainval scene_filter=navtrain_debug \
+export PROGRESS_MODE=gen_gt; \
+python navsim/agents/tools/gen_vocab_full_score.py train_test_split=navtrain_debug \
     +debug=false \
     +scene_filter_name=navtrain_debug \
     +vocab_size=8192 \
     experiment_name=debug \
     worker=ray_distributed_no_torch \
     worker.threads_per_node=128 \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/ori_debug
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/debug/train/ori
 ```
 
 **ensemble**
