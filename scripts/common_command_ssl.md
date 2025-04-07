@@ -285,9 +285,9 @@ python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=n
 
 ### 2. gen full vocab pdm score
 
-bash command (subset score generation)
+bash command (subset score generation) (slurm)
 ```bash
-sh scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_sub???
+bash scripts/slurm_bash/gen_full_vocab_pdm_score/gen_full_vocab_pdm_score_aug_subset-all.sh 2024
 ```
 
 debug

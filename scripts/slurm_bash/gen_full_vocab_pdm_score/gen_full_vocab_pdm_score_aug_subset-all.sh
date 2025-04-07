@@ -7,7 +7,7 @@ do
         --gpu 1 \
         --tasks_per_node 1 \
         --nodes 1 \
-        -n "gen_full_vocab_pdm_score_navtrain_new_sub$idx" \
+        -n "gen_full_vocab_pdm_score_navtrain_sub${idx}_seed_$seed" \
         --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
         --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/gen_full_vocab_pdm_score \
         --email_mode never \
