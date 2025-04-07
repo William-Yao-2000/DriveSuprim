@@ -24,7 +24,6 @@ from shapely import affinity
 from shapely.geometry import Polygon, LineString
 from torchvision import transforms
 
-from det_map.data.datasets.lidar_utils import transform_points
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
 from navsim.agents.hydra_ssl.data.transforms import GaussianBlur
 from navsim.agents.vadv2.vadv2_config import Vadv2Config
