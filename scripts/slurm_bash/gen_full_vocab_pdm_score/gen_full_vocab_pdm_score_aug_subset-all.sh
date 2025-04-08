@@ -1,7 +1,10 @@
 #!/bin/bash
-seed=$1
+start=$1
+end=$2
+seed=$3
+partition=$4
 
-for idx in $(seq 1 1)
+for idx in $(seq $start $end)
 do
     submit_job \
         --gpu 1 \
@@ -14,6 +17,7 @@ do
         --duration 4 \
         --dependent_clones 0 \
         --account av_research \
+        --partition $partition
         -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; \
         bash scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_sub$idx $seed"
     sleep 3
