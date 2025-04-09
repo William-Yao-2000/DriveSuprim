@@ -4,7 +4,7 @@ end_=$2
 seed=$3
 partition=$4
 
-for idx in $(seq $start $end)
+for idx in $(seq $start_ $end_)
 do
     submit_job \
         --gpu 1 \
