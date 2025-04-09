@@ -1,6 +1,6 @@
 #!/bin/bash
-start=$1
-end=$2
+start_=$1
+end_=$2
 seed=$3
 partition=$4
 
