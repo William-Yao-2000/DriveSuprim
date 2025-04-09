@@ -17,7 +17,7 @@ do
         --duration 4 \
         --dependent_clones 0 \
         --account av_research \
-        --partition $partition_
+        --partition $partition_ \
         -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; \
         bash scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_sub$idx $seed_"
     sleep 3
