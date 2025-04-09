@@ -1,7 +1,7 @@
 import yaml
 
-N = 64
-root = '/mnt/f/e2e/navsim2/navsim/planning/script/config/common/train_test_split'
+N = 8
+root = '/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/navsim_ssl_v2/navsim/planning/script/config/common/train_test_split'
 tgt_yaml = 'navtrain'
 
 # Load the original YAML file
@@ -10,6 +10,6 @@ with open(f'{root}/{tgt_yaml}.yaml', 'r') as file:
 
 # Generate and save sub-files
 for i in range(N):
-    data['defaults'][0]['scene_filter'] = f'{tgt_yaml}_sub{i + 1}'
-    with open(f'{root}/{tgt_yaml}_sub{i + 1}.yaml', 'w') as outfile:
+    data['defaults'][0]['scene_filter'] = f'{tgt_yaml}_ngc_sub{i + 1}'
+    with open(f'{root}/{tgt_yaml}_ngc_sub{i + 1}.yaml', 'w') as outfile:
         yaml.dump(data, outfile, default_flow_style=False)

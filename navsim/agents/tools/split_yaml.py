@@ -8,8 +8,8 @@ def quoted_presenter(dumper, data):
 
 yaml.add_representer(str, quoted_presenter)
 
-N = 64
-root = '/mnt/f/e2e/navsim2/navsim/planning/script/config/common/train_test_split/scene_filter'
+N = 8
+root = '/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/navsim_ssl_v2/navsim/planning/script/config/common/train_test_split/scene_filter'
 tgt_yaml = 'navtrain'
 
 # Load the original YAML file
@@ -23,5 +23,5 @@ split_tokens = [tokens[i:i + len(tokens) // N] for i in range(0, len(tokens), le
 # Generate and save sub-files
 for i, token_part in enumerate(split_tokens):
     data['tokens'] = token_part
-    with open(f'{root}/{tgt_yaml}_sub{i + 1}.yaml', 'w') as outfile:
+    with open(f'{root}/{tgt_yaml}_ngc_sub{i + 1}.yaml', 'w') as outfile:
         yaml.dump(data, outfile, default_flow_style=False)
