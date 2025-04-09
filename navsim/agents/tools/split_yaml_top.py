@@ -1,6 +1,6 @@
 import yaml
 
-N = 8
+N = 12
 root = '/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/navsim_ssl_v2/navsim/planning/script/config/common/train_test_split'
 tgt_yaml = 'navtrain'
 

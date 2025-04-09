@@ -1,0 +1,3 @@
+data_split: trainval
+defaults:
+- scene_filter: navtrain_ngc_sub12

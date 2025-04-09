@@ -262,10 +262,10 @@ augmentation
 python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=navtrain \
     +debug=false \
     worker.threads_per_node=192 \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/random_aug/rot_30-trans_0-va_0-p_0.5-seed_2026 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/random_aug/rot_30-trans_0-va_0-p_0.5-seed_2025 \
     aug_train.rotation=30 \
     aug_train.va=0 \
-    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-seed_2026.json \
+    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-seed_2025.json \
     --config-name metric_caching_aug_train
 ```
 
