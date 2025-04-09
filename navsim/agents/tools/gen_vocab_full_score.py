@@ -53,6 +53,11 @@ def main(cfg: DictConfig) -> None:
     os.makedirs(f'{trajpdm_root}/{dir}', exist_ok=True)
     result_path = f'{trajpdm_root}/{dir}/{scene_filter_name}.pkl'
     print(f'Results will be written to {result_path}')
+    dir = f'ori/vocab_score_{vocab_size}_{scene_filter_name}'
+
+    if cfg.debug:
+        os.environ['VOCAB_SCORING_DEBUG'] = 'true'
+        import pdb; pdb.set_trace()
 
     data_points = [
         {
@@ -68,6 +73,7 @@ def main(cfg: DictConfig) -> None:
         for token in data['tokens']:
             new_data_points.append({
                 "cfg": cfg,
+                "dir": dir,
                 "log_file": data['log_file'],
                 "token": token,
                 "vocab": vocab
@@ -90,6 +96,7 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[D
     tokens = [a["token"] for a in args]
     cfg: DictConfig = args[0]["cfg"]
     vocab_trajectories = args[0]["vocab"]
+    dir = args[0]['dir']
 
     simulator: PDMSimulator = instantiate(cfg.simulator)
     scorer = instantiate(cfg.scorer)
@@ -113,6 +120,9 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[D
 
     tokens_to_evaluate = list(set(scene_loader.tokens) & set(metric_cache_loader.tokens))
     pdm_results: List[Dict[str, Any]] = []
+
+    if os.getenv('VOCAB_SCORING_DEBUG') == 'true':
+        import pdb; pdb.set_trace()
     for idx, (token) in enumerate(tokens_to_evaluate):
         logger.info(
             f"Processing scenario {idx + 1} / {len(tokens_to_evaluate)} in thread_id={thread_id}, node_id={node_id}"
