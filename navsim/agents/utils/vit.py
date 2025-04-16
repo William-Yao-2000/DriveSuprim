@@ -2,6 +2,7 @@ from functools import partial
 import math
 import logging
 from typing import Sequence, Tuple, Union, Callable
+import os
 
 import torch
 import torch.nn as nn
@@ -161,7 +162,7 @@ class DinoVisionTransformer(nn.Module):
         self.norm = norm_layer(embed_dim)
         self.head = nn.Identity()
 
-        # self.mask_token = nn.Parameter(torch.zeros(1, embed_dim))
+        self.mask_token = nn.Parameter(torch.zeros(1, embed_dim))  # FIXME: may have bug when not using mask loss
 
         self.init_weights()
 
@@ -261,8 +262,8 @@ class DinoVisionTransformer(nn.Module):
             "masks": masks,
         }
 
-    def _get_intermediate_layers_not_chunked(self, x, n=1):
-        x = self.prepare_tokens_with_masks(x)
+    def _get_intermediate_layers_not_chunked(self, x, n=1, masks=None):
+        x = self.prepare_tokens_with_masks(x, masks=masks)
         # If n is an int, take the n last blocks. If it's a list, take them
         output, total_block_len = [], len(self.blocks)
         blocks_to_take = range(total_block_len - n, total_block_len) if isinstance(n, int) else n
@@ -291,6 +292,7 @@ class DinoVisionTransformer(nn.Module):
         self,
         x: torch.Tensor,
         n: Union[int, Sequence] = 1,  # Layers or n last layers to take
+        masks=None,
         reshape: bool = False,
         return_class_token: bool = False,
         norm=True,
@@ -298,7 +300,7 @@ class DinoVisionTransformer(nn.Module):
         if self.chunked_blocks:
             outputs = self._get_intermediate_layers_chunked(x, n)
         else:
-            outputs = self._get_intermediate_layers_not_chunked(x, n)
+            outputs = self._get_intermediate_layers_not_chunked(x, n, masks)
         if norm:
             outputs = [self.norm(out) for out in outputs]
         class_tokens = [out[:, 0] for out in outputs]
@@ -353,9 +355,9 @@ class DAViT(nn.Module):
                 valid_dict[k] = v
             self.load_state_dict(valid_dict, strict=False)
 
-    def forward(self, x):
-        features = self.pretrained.get_intermediate_layers(x, 1,
-                                                           return_class_token=False,
+    def forward(self, x, masks=None, return_class_token=False):
+        features = self.pretrained.get_intermediate_layers(x, 1, masks,
+                                                           return_class_token=return_class_token,
                                                            reshape=True
                                                            )
         return features

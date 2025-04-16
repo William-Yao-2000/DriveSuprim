@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
 from navsim.agents.hydra_ssl.hydra_features_ssl import HydraSSLFeatureBuilder, HydraSSLTargetBuilder
 from navsim.agents.hydra_ssl.ssl_meta_arch import SSLMetaArch
-from navsim.agents.hydra_ssl.hydra_loss_fn_ssl import hydra_kd_imi_agent_loss_robust, hydra_kd_imi_agent_loss_2_stage
+from navsim.agents.hydra_ssl.hydra_loss_fn_ssl import hydra_kd_imi_agent_loss_robust, hydra_kd_imi_agent_loss_single_stage
 from navsim.agents.hydra_ssl.hydra_model_v_ssl import HydraModel
 
 from navsim.common.dataclasses import SensorConfig
@@ -42,14 +42,21 @@ class HydraAgentSSL(AbstractAgent):
             pdm_split=None,
             metrics=None,
     ):
-        super().__init__()
+        super().__init__(
+            trajectory_sampling=config.trajectory_sampling
+        )
         config.trajectory_pdm_weight = {
-            'noc': 3.0,
-            'da': 3.0,
-            'ttc': 2.0,
-            'progress': config.progress_weight,
-            'comfort': 1.0,
+            'no_at_fault_collisions': 3.0,
+            'drivable_area_compliance': 3.0,
+            'time_to_collision_within_bound': 4.0,
+            'ego_progress': 2.0,
+            'driving_direction_compliance': 1.0,
+            'lane_keeping': 2.0,
+            'traffic_light_compliance': 3.0,
+            'history_comfort': 1.0,
         }
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         self._config = config
         self._lr = lr
         self.metrics = metrics
@@ -62,8 +69,7 @@ class HydraAgentSSL(AbstractAgent):
         new_pkl_dir = f'vocab_score_full_{self.vocab_size}_navtrain'
         self.ensemble_aug = config.ego_perturb.ensemble_aug
         self.training = config.training
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+
         if self.training:
             self.ori_vocab_pdm_score_full = pickle.load(
                 open(f'{config.ori_vocab_pdm_score_full_path}', 'rb'))
@@ -155,8 +161,8 @@ class HydraAgentSSL(AbstractAgent):
             predictions: List[Dict[str, torch.Tensor]],
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         # get the pdm score by tokens
 
         # ori
@@ -259,7 +265,7 @@ class HydraAgentSSL(AbstractAgent):
         rot_loss = rot_loss / len(student_normed_cls_lst)
         return rot_loss
     
-    def compute_loss_2_stage(
+    def compute_loss_multi_stage(
         self,
         features,
         targets: Dict[str, torch.Tensor],
@@ -267,51 +273,73 @@ class HydraAgentSSL(AbstractAgent):
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
+        result_dict = dict()
         # ori
-        ori_predictions = predictions[0]['topk']
-        ori_selected_indices = ori_predictions['topk_selected_indices']
-        scores = {}
-        for k in self.metrics:
-            tmp = [self.ori_vocab_pdm_score_full[token][k][None] for token in tokens]
-            full_scores = torch.from_numpy(np.concatenate(tmp, axis=0)).to(ori_selected_indices.device)
-            # Extract scores based on selected indices [bs, topk]
-            batch_size, topk = ori_selected_indices.shape
-            batch_indices = torch.arange(batch_size, device=ori_selected_indices.device).unsqueeze(1).expand(-1, topk)
-            scores[k] = full_scores[batch_indices, ori_selected_indices]
-        ori_loss = hydra_kd_imi_agent_loss_2_stage(ori_predictions, self._config, scores)
+        ori_loss_lst = []
+        ori_predictions = predictions[0]['refinement']
+        num_stage = len(ori_predictions)
+        for i in range(num_stage):
+            pred_i = ori_predictions[i]
+            selected_indices_i = pred_i['indices_absolute']
+            scores = {}
+            for k in self.metrics:
+                tmp = [self.ori_vocab_pdm_score_full[token][k][None] for token in tokens]
+                full_scores = torch.from_numpy(np.concatenate(tmp, axis=0)).to(selected_indices_i.device)  # [bs, vocab_size]
+                # Extract scores based on selected indices [bs, topk_stage_i]
+                batch_size, topk = selected_indices_i.shape
+                batch_indices = torch.arange(batch_size, device=selected_indices_i.device).unsqueeze(1).expand(-1, topk)
+                scores[k] = full_scores[batch_indices, selected_indices_i]  # [bs, topk_stage_i]
+            ori_loss_i = hydra_kd_imi_agent_loss_single_stage(pred_i, self._config, scores)
+            ori_loss_lst.append(ori_loss_i)
+        total_ori_loss = sum([loss_tup[0] for loss_tup in ori_loss_lst])
+        total_ori_loss_dict = {}
+        for i, loss_tup in enumerate(ori_loss_lst):
+            loss_dict = loss_tup[1]
+            for _key, _value in loss_dict.items():
+                total_ori_loss_dict[f"stage_{i+2}_{_key}"] = _value
+        result_dict['ori'] = (total_ori_loss, total_ori_loss_dict)
         if self._config.only_ori_input:
-            return { "ori": ori_loss }
+            return result_dict
 
         # aug
         _aug_vocab_pdm_score = {}
         for token in tokens:
             with open(os.path.join(self.aug_vocab_pdm_score_dir, f'{token}.pkl'), 'rb') as f:
                 _aug_vocab_pdm_score[token] = pickle.load(f)
-        aug_loss = []
+        aug_loss_all_mode_lst = []
         for idx in range(self._config.student_rotation_ensemble):
-            aug_predictions = predictions[idx+1]['topk']
-            aug_selected_indices = aug_predictions['topk_selected_indices']
-            scores = {}
-            for k in self.metrics:
-                tmp = [_aug_vocab_pdm_score[token][idx][k][None] for token in tokens]
-                full_scores = torch.from_numpy(np.concatenate(tmp, axis=0)).to(aug_selected_indices.device)
-                batch_size, topk = aug_selected_indices.shape
-                batch_indices = torch.arange(batch_size, device=aug_selected_indices.device).unsqueeze(1).expand(-1, topk)
-                scores[k] = full_scores[batch_indices, aug_selected_indices]
-            aug_loss.append(hydra_kd_imi_agent_loss_2_stage(aug_predictions, self._config, scores))
+            aug_loss_lst = []
+            aug_idx_predictions = predictions[idx+1]['refinement']
+            for i in range(num_stage):
+                aug_idx_pred_i = aug_idx_predictions[i]
+                aug_idx_selected_indices_i = aug_idx_pred_i['indices_absolute']
+                scores = {}
+                for k in self.metrics:
+                    tmp = [_aug_vocab_pdm_score[token][idx][k][None] for token in tokens]
+                    full_scores = torch.from_numpy(np.concatenate(tmp, axis=0)).to(aug_idx_selected_indices_i.device)
+                    batch_size, topk = aug_idx_selected_indices_i.shape
+                    batch_indices = torch.arange(batch_size, device=aug_idx_selected_indices_i.device).unsqueeze(1).expand(-1, topk)
+                    scores[k] = full_scores[batch_indices, aug_idx_selected_indices_i]
+                aug_loss_lst.append(hydra_kd_imi_agent_loss_single_stage(aug_idx_pred_i, self._config, scores))
+            aug_loss_single_mode = sum([loss_tup[0] for loss_tup in aug_loss_lst])
+            aug_loss_single_mode_dict = {}
+            for i, loss_tup in enumerate(aug_loss_lst):
+                loss_dict = loss_tup[1]
+                for _key, _value in loss_dict.items():
+                    aug_loss_single_mode_dict[f"stage_{i+2}_{_key}"] = _value
+            aug_loss_all_mode_lst.append((aug_loss_single_mode, aug_loss_single_mode_dict))
         
         # Calculate average loss and loss dict
-        avg_aug_loss = torch.mean(torch.stack([loss[0] for loss in aug_loss]))
+        avg_aug_loss = torch.mean(torch.stack([loss[0] for loss in aug_loss_all_mode_lst]))
         avg_aug_loss_dict = {}
-        for key in aug_loss[0][1].keys():
-            avg_aug_loss_dict[key] = torch.mean(torch.stack([loss[1][key] for loss in aug_loss]))
-        return {
-            "ori": ori_loss,
-            "aug": (avg_aug_loss, avg_aug_loss_dict),
-        }
+        for key in aug_loss_all_mode_lst[0][1].keys():
+            avg_aug_loss_dict[key] = torch.mean(torch.stack([loss[1][key] for loss in aug_loss_all_mode_lst]))
+        result_dict['aug'] = (avg_aug_loss, avg_aug_loss_dict)
+
+        return result_dict
 
     def get_optimizers(self) -> Union[Optimizer, Dict[str, Union[Optimizer, LRScheduler]]]:
         backbone_params_name = '_backbone.image_encoder'

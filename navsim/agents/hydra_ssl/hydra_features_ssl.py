@@ -26,7 +26,7 @@ from torchvision import transforms
 
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
 from navsim.agents.hydra_ssl.data.transforms import GaussianBlur
-from navsim.agents.vadv2.vadv2_config import Vadv2Config
+from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
 from navsim.common.dataclasses import AgentInput, Scene, Annotations
 from navsim.common.enums import BoundingBoxIndex, LidarIndex
 from navsim.evaluate.pdm_score import transform_trajectory, get_trajectory_as_array
@@ -125,58 +125,6 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         features.update(self._get_camera_feature(agent_input, initial_token, rotation_num=n_rotated))  # List[torch.Tensor], tensor.shape == [c, h, w]
         if self._config.use_back_view:
             features["camera_feature_back"] = self._get_camera_feature_back(agent_input)
-
-        # if self._config.use_transfuser:
-        #     features.update(self._get_lidar_feature(agent_input, initial_token, rotation_num=n_rotated))
-        
-        sensor2lidar_rotation, sensor2lidar_translation, intrinsics = [], [], []
-
-        #agent_input.cameras[-1]
-        # camera_timestamp = [agent_input.cameras[-2], agent_input.cameras[-1]]
-        camera_timestamp = [agent_input.cameras[-1]]
-        for camera in camera_timestamp:
-            sensor2lidar_rotation_tmp, sensor2lidar_translation_tmp, intrinsics_tmp = [], [], []
-            flag = False
-            for cam_k, cam in camera.to_dict().items():
-                features[f"intrinsics_{cam_k}"] = cam.intrinsics
-                features[f"sensor2lidar_rotation_{cam_k}"] = cam.sensor2lidar_rotation
-                features[f"sensor2lidar_translation_{cam_k}"] = cam.sensor2lidar_translation
-                if cam.intrinsics is not None and np.any(cam.intrinsics):
-                    flag = True
-                    features[f"intrinsics_{cam_k}"] = torch.tensor(features[f"intrinsics_{cam_k}"])
-                    features[f"sensor2lidar_rotation_{cam_k}"] = torch.tensor(features[f"sensor2lidar_rotation_{cam_k}"])
-                    features[f"sensor2lidar_translation_{cam_k}"] = torch.tensor(features[f"sensor2lidar_translation_{cam_k}"])
-
-
-            sensor2lidar_rotation_tmp.append(features["sensor2lidar_rotation_cam_l0"])
-            sensor2lidar_rotation_tmp.append(features["sensor2lidar_rotation_cam_f0"])
-            sensor2lidar_rotation_tmp.append(features["sensor2lidar_rotation_cam_r0"])
-
-
-            sensor2lidar_translation_tmp.append(features["sensor2lidar_translation_cam_l0"])
-            sensor2lidar_translation_tmp.append(features["sensor2lidar_translation_cam_f0"])
-            sensor2lidar_translation_tmp.append(features["sensor2lidar_translation_cam_r0"])
-
-
-            intrinsics_tmp.append(features["intrinsics_cam_l0"])
-            intrinsics_tmp.append(features["intrinsics_cam_f0"])
-            intrinsics_tmp.append(features["intrinsics_cam_r0"])
-
-            if flag:
-                sensor2lidar_rotation = sensor2lidar_rotation_tmp
-                sensor2lidar_translation = sensor2lidar_translation_tmp
-                intrinsics = intrinsics_tmp
-                # sensor2lidar_rotation.append(torch.stack(sensor2lidar_rotation_tmp))
-                # sensor2lidar_translation.append(torch.stack(sensor2lidar_translation_tmp))
-                # intrinsics.append(torch.stack(intrinsics_tmp))
-            else:
-                sensor2lidar_rotation.append(None)
-                sensor2lidar_translation.append(None)
-                intrinsics.append(None)
-        features["sensor2lidar_rotation"] = sensor2lidar_rotation
-        features["sensor2lidar_translation"] = sensor2lidar_translation
-        features["intrinsics"] = intrinsics
-
 
         if self._config.use_pers_bev_embed:
             features["pers_bev"] = self._get_pers_bev(agent_input)
@@ -410,7 +358,7 @@ class HydraSSLTargetBuilder(AbstractTargetBuilder):
         #     import pdb; pdb.set_trace()
         initial_token = scene.scene_metadata.initial_token
         future_traj = scene.get_future_trajectory(
-            num_trajectory_frames=self._config.trajectory_sampling.num_poses
+            num_trajectory_frames=int(4 / 0.5)
         )  # [8, 3] (local pose, do not include present pose)
 
         if not self._config.only_ori_input and self._config.training:
@@ -506,7 +454,7 @@ class HydraSSLTargetBuilder(AbstractTargetBuilder):
         max_agents = self._config.num_bounding_boxes
         agent_states_list: List[npt.NDArray[np.float32]] = []
 
-        def _xy_in_lidar(x: float, y: float, config: Vadv2Config) -> bool:
+        def _xy_in_lidar(x: float, y: float, config: HydraConfigSSL) -> bool:
             return (config.lidar_min_x <= x <= config.lidar_max_x) and (
                     config.lidar_min_y <= y <= config.lidar_max_y
             )

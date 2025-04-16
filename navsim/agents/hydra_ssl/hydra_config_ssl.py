@@ -89,12 +89,15 @@ class IbotConfig:
 
 @dataclass
 class RefinementConfig:
-    use_2_stage: bool = False
-    num_top_k: int = 16
+    use_multi_stage: bool = False
     refinement_approach: str = "offset_decoder"
+    num_refinement_stage: int = 2
+    stage_layers: str = "3+3"
+    topks: str = "256+16"
 
-    # offset decoder
-    n_offset_dec_layers: int = 3
+    use_mid_output: bool = True
+    use_offset_refinement: bool = True
+    use_separate_stage_heads: bool = True
 
 
 @dataclass
@@ -109,12 +112,14 @@ class HydraConfigSSL(TransfuserConfig):
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0
     trajectory_pdm_weight = {
-        'noc': 3.0,
-        'da': 3.0,
-        'dd': 3.0,
-        'ttc': 2.0,
-        'progress': 1.0,
-        'comfort': 1.0,
+        'no_at_fault_collisions': 3.0,
+        'drivable_area_compliance': 3.0,
+        'time_to_collision_within_bound': 4.0,
+        'ego_progress': 2.0,
+        'driving_direction_compliance': 1.0,
+        'lane_keeping': 2.0,
+        'traffic_light_compliance': 3.0,
+        'history_comfort': 1.0,
     }
     progress_weight: float = 2.0
     ttc_weight: float = 2.0

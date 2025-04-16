@@ -1,16 +1,16 @@
-from typing import Dict
+from typing import Dict, List
 import os, pickle
+import copy
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-from navsim.agents.hydra.hydra_backbone_pe import HydraBackbonePE
+from navsim.agents.hydra_ssl.hydra_backbone_pe_v_ssl import HydraBackbonePE
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
 from navsim.agents.transfuser.transfuser_model import AgentHead
 from navsim.agents.utils.attn import MemoryEffTransformer
 from navsim.agents.utils.nerf import nerf_positional_encoding
-from navsim.agents.vadv2.vadv2_config import Vadv2Config
 
 
 class HydraModel(nn.Module):
@@ -40,22 +40,6 @@ class HydraModel(nn.Module):
         self.downscale_layer = nn.Conv2d(self._backbone.img_feat_c, config.tf_d_model, kernel_size=1)
         self._status_encoding = nn.Linear((4 + 2 + 2) * config.num_ego_status, config.tf_d_model)
 
-
-        tf_decoder_layer = nn.TransformerDecoderLayer(
-            d_model=config.tf_d_model,
-            nhead=config.tf_num_head,
-            dim_feedforward=config.tf_d_ffn,
-            dropout=config.tf_dropout,
-            batch_first=True,
-        )
-
-        # self._tf_decoder = nn.TransformerDecoder(tf_decoder_layer, config.tf_num_layers)
-        # self._agent_head = AgentHead(
-        #     num_agents=config.num_bounding_boxes,
-        #     d_ffn=config.tf_d_ffn,
-        #     d_model=config.tf_d_model,
-        # )
-
         self._trajectory_head = HydraTrajHead(
             num_poses=config.trajectory_sampling.num_poses,
             d_ffn=config.tf_d_ffn,
@@ -66,15 +50,20 @@ class HydraModel(nn.Module):
             config=config
         )
 
-        self.use_2_stage = self._config.refinement.use_2_stage
-        if self.use_2_stage:
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+
+        self.use_multi_stage = self._config.refinement.use_multi_stage
+        if self.use_multi_stage:
             if self._config.refinement.refinement_approach == 'offset_decoder':
                 self._trajectory_offset_head = TrajOffsetHead(
                     d_ffn=config.tf_d_ffn,
                     d_model=config.tf_d_model,
                     nhead=config.vadv2_head_nhead,
-                    nlayers=config.refinement.n_offset_dec_layers,
                     d_backbone=self._backbone.img_feat_c,
+                    num_stage=config.refinement.num_refinement_stage,
+                    stage_layers=config.refinement.stage_layers,
+                    topks=config.refinement.topks,
                     config=config
                 )
             else:
@@ -110,8 +99,10 @@ class HydraModel(nn.Module):
                 masks=None,
                 interpolated_traj=None,
                 tokens=None) -> Dict[str, torch.Tensor]:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+        
         output: Dict[str, torch.Tensor] = {}
 
         camera_feature: torch.Tensor = features["camera_feature"]  # List[torch.Tensor], len == seq_len, tensor.shape == [b, 3, h, w]
@@ -145,18 +136,11 @@ class HydraModel(nn.Module):
         output.update(img_feat_dict)
         trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj)
 
-        if self.use_2_stage:
-            # result["topk_trajs"] = self.vocab.data[top_indices]
-            # # Gather the statuses for the top-k trajectories
-            # batch_indices = torch.arange(B, device=top_indices.device).view(-1, 1).expand(-1, topk)
-            topk_trajs_status = trajectory['topk'].pop("topk_trajs_status")  # [bs, topk, c]
+        if self.use_multi_stage:
             bev_feat_fg = img_feat_dict['patch_token']  # [bs, c_vit, w, h]
-            layer_results, selected_indices = self._trajectory_offset_head(bev_feat_fg, topk_trajs_status, trajectory['topk']['coarse_score'])
-            trajectory['topk']['refinement_scores'] = layer_results
-            # Get the best trajectory from the top-k based on refinement scores
-            batch_indices = torch.arange(batch_size, device=selected_indices.device)
-            trajectory['topk']['trajectory_2_stage'] = trajectory['topk']['topk_trajs'][batch_indices, selected_indices]
-
+            final_traj = self._trajectory_offset_head(bev_feat_fg, trajectory['refinement'])
+            trajectory['final_traj'] = final_traj
+            
 
         if self._config.lab.check_top_k_traj:
             topk_selected_indices_bs = trajectory['topk_selected_indices']
@@ -194,28 +178,43 @@ class HydraTrajHead(nn.Module):
         )
 
         self.heads = nn.ModuleDict({
-            'noc': nn.Sequential(
+            'no_at_fault_collisions': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'da':
+            'drivable_area_compliance':
                 nn.Sequential(
                     nn.Linear(d_model, d_ffn),
                     nn.ReLU(),
                     nn.Linear(d_ffn, 1),
                 ),
-            'ttc': nn.Sequential(
+            'time_to_collision_within_bound': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'comfort': nn.Sequential(
+            'ego_progress': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'progress': nn.Sequential(
+            'driving_direction_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'lane_keeping': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'traffic_light_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'history_comfort': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
@@ -276,6 +275,10 @@ class HydraTrajHead(nn.Module):
             embedded_vocab = self.encoder(embedded_vocab).repeat(B, 1, 1)
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
+
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
         result = {}
@@ -286,33 +289,43 @@ class HydraTrajHead(nn.Module):
             else:
                 result[k] = head(dist_status).squeeze(-1).sigmoid()
         scores = (
-                0.05 * result['imi'].softmax(-1).log() +
-                0.5 * result['noc'].log() +
-                0.5 * result['da'].log() +
-                8.0 * (5 * result['ttc'] + 2 * result['comfort'] + 5 * result['progress']).log()
+            0.03 * result['imi'].softmax(-1).log() +
+            0.1 * result['traffic_light_compliance'].sigmoid().log() +
+            0.1 * result['no_at_fault_collisions'].sigmoid().log() +
+            0.9 * result['drivable_area_compliance'].sigmoid().log() +
+            0.2 * result['driving_direction_compliance'].sigmoid().log() +
+            6.0 * (7.0 * result['time_to_collision_within_bound'].sigmoid() +
+                   7.0 * result['ego_progress'].sigmoid() +
+                   3.0 * result['lane_keeping'].sigmoid() +
+                   1.0 * result['history_comfort'].sigmoid()
+                   ).log()
         )
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
         selected_indices = scores.argmax(1)
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
         result["selected_indices"] = selected_indices
 
-        if self._config.refinement.use_2_stage:
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+
+        if self._config.refinement.use_multi_stage:
             assert self._config.lab.check_top_k_traj is False
-            topk = self._config.refinement.num_top_k
-            top_values, top_indices = torch.topk(scores, k=topk, dim=1)
-            result['topk'] = {}
-            result['topk']["topk_trajs"] = self.vocab.data[top_indices]
+            topk_str = str(self._config.refinement.topks)
+            topk = int(topk_str.split('+')[0])
+            topk_values, topk_indices = torch.topk(scores, k=topk, dim=1)
+            result['refinement'] = []  # dicts of different refinement stages
+            _dict = {}
+            _dict["trajs"] = self.vocab.data[topk_indices]
             # Gather the statuses for the top-k trajectories
-            batch_indices = torch.arange(B, device=top_indices.device).view(-1, 1).expand(-1, topk)
-            result['topk']["topk_trajs_status"] = dist_status[batch_indices, top_indices]
-            result['topk']["topk_selected_indices"] = top_indices
+            batch_indices = torch.arange(B, device=topk_indices.device).view(-1, 1).expand(-1, topk)
+            _dict["trajs_status"] = dist_status[batch_indices, topk_indices]
+            _dict['indices_absolute'] = topk_indices
             
             # Store the scores for each top-k trajectory
-            result['topk']['coarse_score'] = {}
-            for score_key in ['noc', 'da', 'ttc', 'comfort', 'progress']:
-                result['topk']['coarse_score'][score_key] = result[score_key][batch_indices, top_indices]
+            _dict['coarse_score'] = {}
+            for score_key in self._config.trajectory_pdm_weight.keys():
+                _dict['coarse_score'][score_key] = result[score_key][batch_indices, topk_indices]
+            result['refinement'].append(_dict)
 
         # debug
         if self._config.lab.check_top_k_traj:
@@ -325,49 +338,91 @@ class HydraTrajHead(nn.Module):
     
 
 class TrajOffsetHead(nn.Module):
-    def __init__(self, d_ffn: int, d_model: int, nhead: int, nlayers: int, d_backbone: int,
+    def __init__(self, d_ffn: int, d_model: int, nhead: int, d_backbone: int,
+                 num_stage: int, stage_layers: str, topks: str,
                  config: HydraConfigSSL = None
                  ):
         super().__init__()
+
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+        stage_layers = str(stage_layers)
+        topks = str(topks)
+        
         self._config = config
+        self.num_stage = num_stage
+        self.stage_layers = [int(sl) for sl in stage_layers.split('+')]
+        self.topks = [int(topk) for topk in topks.split('+')]
+        assert len(self.stage_layers) == num_stage and len(self.topks) == num_stage
+        self.nlayers = sum(self.stage_layers)
 
-        self.downscale_layer = nn.Conv2d(d_backbone, d_model, kernel_size=1)
+        self.use_mid_output = config.refinement.use_mid_output
+        self.use_offset_refinement = config.refinement.use_offset_refinement
+        if self.use_offset_refinement:
+            assert self.use_mid_output == True
+        self.use_separate_stage_heads = config.refinement.use_separate_stage_heads
 
-        self.transformer = TransformerDecoder_v2(
+        downscale_layer = nn.Conv2d(d_backbone, d_model, kernel_size=1)
+        if self.use_separate_stage_heads:
+            self.downscale_layers = nn.ModuleList([copy.deepcopy(downscale_layer) for _ in range(num_stage)])
+        else:
+            self.downscale_layers = nn.ModuleList([downscale_layer for _ in range(num_stage)])
+
+        transformer_blocks = [TransformerDecoder_v2(
             nn.TransformerDecoderLayer(
                 d_model, nhead, d_ffn,
                 dropout=0.0, batch_first=True
-            ), nlayers
-        )
+            ), layer
+        ) for layer in self.stage_layers]
+        self.transformer_blocks = nn.ModuleList(transformer_blocks)
 
-        self.heads = nn.ModuleDict({
-            'noc': nn.Sequential(
+        heads = nn.ModuleDict({
+            'no_at_fault_collisions': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'da':
+            'drivable_area_compliance':
                 nn.Sequential(
                     nn.Linear(d_model, d_ffn),
                     nn.ReLU(),
                     nn.Linear(d_ffn, 1),
                 ),
-            'ttc': nn.Sequential(
+            'time_to_collision_within_bound': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'comfort': nn.Sequential(
+            'ego_progress': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
-            'progress': nn.Sequential(
+            'driving_direction_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'lane_keeping': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'traffic_light_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'history_comfort': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             ),
         })
+        if self.use_separate_stage_heads:
+            self.multi_stage_heads = nn.ModuleList([copy.deepcopy(heads) for _ in range(num_stage)])
+        else:
+            self.multi_stage_heads = nn.ModuleList([heads for _ in range(num_stage)])
 
         self.inference_da_weight = config.inference_da_weight
         self.normalize_vocab_pos = config.normalize_vocab_pos
@@ -379,7 +434,7 @@ class TrajOffsetHead(nn.Module):
                 dropout=0.0
             )
 
-    def forward(self, bev_feat_fg, status_encoding, coarse_score, interpolated_traj=None) -> Dict[str, torch.Tensor]:
+    def forward(self, bev_feat_fg, refinement_dict) -> Dict[str, torch.Tensor]:
         # bev_feature_fg (bev_feature_fine_grained): bs, c_vit, h, w
         # status_encoding: bs, topk, c
         # coarse_scores: dict
@@ -387,36 +442,70 @@ class TrajOffsetHead(nn.Module):
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
-        bev_feat_fg = self.downscale_layer(bev_feat_fg).flatten(2)
+        B = bev_feat_fg.shape[0]
+        
+        for i in range(self.num_stage):
+            _bev_feat_fg = self.downscale_layers[i](bev_feat_fg).flatten(2)
+            status_encoding = refinement_dict[-1]['trajs_status']  # [bs, topk_stage_i, c]
+            tr_out_lst = self.transformer_blocks[i](status_encoding, _bev_feat_fg)  # [layer_stage_i, bs, topk_stage_i, c]
 
-        tr_out_lst = self.transformer(status_encoding, bev_feat_fg)  # [b, n_vocab, c]
+            # Compute scores for each layer
+            layer_results = []
+            # Initialize reference scores from coarse_score
+            reference = refinement_dict[-1]['coarse_score']
+            for j, dist_status in enumerate(tr_out_lst):
+                layer_result = {}
+                for k, head in self.multi_stage_heads[i].items():
+                    if self.use_offset_refinement:
+                        # Compute offset and apply to reference using inverse sigmoid
+                        offset = head(dist_status).squeeze(-1)
+                        # inverse_sigmoid(reference) + offset, then sigmoid
+                        reference_inv = _inverse_sigmoid(reference[k])
+                        layer_result[k] = torch.sigmoid(reference_inv + offset)
+                        # Update reference for next layer
+                        reference[k] = layer_result[k]
+                    else:
+                        layer_result[k] = torch.sigmoid(head(dist_status).squeeze(-1))
+                layer_results.append(layer_result)
+            
+            if not self.use_mid_output:
+                layer_results = layer_results[-1:]
+            refinement_dict[-1]['layer_results'] = layer_results
+            
+            last_layer_result = layer_results[-1]
+            scores = (
+                0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
+                0.1 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
+                0.9 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                0.2 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
+                6.0 * (7.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
+                        7.0 * last_layer_result['ego_progress'].sigmoid() +
+                        3.0 * last_layer_result['lane_keeping'].sigmoid() +
+                        1.0 * last_layer_result['history_comfort'].sigmoid()
+                        ).log()
+            )
 
-        # Compute scores for each layer
-        layer_results = []
-        # Initialize reference scores from coarse_score
-        reference = coarse_score
-        for i, dist_status in enumerate(tr_out_lst):
-            layer_result = {}
-            for k, head in self.heads.items():
-                # Compute offset and apply to reference using inverse sigmoid
-                offset = head(dist_status).squeeze(-1)
-                # inverse_sigmoid(reference) + offset, then sigmoid
-                reference_inv = _inverse_sigmoid(reference[k])
-                layer_result[k] = torch.sigmoid(reference_inv + offset)
-                # Update reference for next layer
-                reference[k] = layer_result[k]
-            layer_results.append(layer_result)
+            if i != self.num_stage-1:
+                _next_layer_dict = {}
+                _next_topk = self.topks[i+1]
+                _, select_indices = torch.topk(scores, k=_next_topk, dim=1)
+                batch_indices = torch.arange(B, device=select_indices.device).view(-1, 1).expand(-1, _next_topk)
 
-        # Calculate final scores using the last layer's results
-        last_layer = layer_results[-1]
-        scores = (
-                0.5 * last_layer['noc'].log() +
-                0.5 * last_layer['da'].log() +
-                8.0 * (5 * last_layer['ttc'] + 2 * last_layer['comfort'] + 5 * last_layer['progress']).log()
-        )
-
-        selected_indices = scores.argmax(1)
-        return layer_results, selected_indices
+                _next_layer_dict["trajs"] = refinement_dict[-1]['trajs'][batch_indices, select_indices]
+                _next_layer_dict["trajs_status"] = tr_out_lst[-1][batch_indices, select_indices]
+                _next_layer_dict['indices_absolute'] = refinement_dict[-1]['indices_absolute'][batch_indices, select_indices]
+                _next_layer_dict['coarse_score'] = {}
+                for score_key in self._config.trajectory_pdm_weight.keys():
+                    _next_layer_dict['coarse_score'][score_key] = last_layer_result[score_key][batch_indices, select_indices]
+                
+                refinement_dict.append(_next_layer_dict)
+            
+            else:
+                select_indices = scores.argmax(1)
+                batch_indices = torch.arange(B, device=select_indices.device)
+                final_traj = refinement_dict[-1]['trajs'][batch_indices, select_indices]
+        
+        return final_traj
     
 
 class TransformerDecoder_v2(nn.TransformerDecoder):

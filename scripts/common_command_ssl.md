@@ -285,10 +285,12 @@ python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=n
 
 ### 2. gen full vocab pdm score
 
-bash command (subset score generation) (slurm)
+bash command (subset score generation)
 ```bash
-bash scripts/slurm_bash/gen_full_vocab_pdm_score/gen_full_vocab_pdm_score_aug_subset-all.sh 2024
+bash scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_ngc_sub1 2024
 ```
+
+
 
 debug
 ```bash
@@ -320,6 +322,31 @@ python navsim/agents/tools/gen_vocab_full_score_aug_train.py train_test_split=na
     experiment_name=debug
 ```
 
+ori
+```bash
+export PROGRESS_MODE=gen_gt; \
+python navsim/agents/tools/gen_vocab_full_score.py train_test_split=navtrain_ngc_sub1 \
+    +debug=false \
+    +vocab_size=8192 \
+    +scene_filter_name=navtrain_ngc_sub1 \
+    experiment_name=full_vocab_pdm_scoring_aug/ori/navtrain_ngc_sub1 \
+    worker.threads_per_node=128 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/ori
+```
+
+ori debug
+```bash
+export PROGRESS_MODE=gen_gt; \
+python navsim/agents/tools/gen_vocab_full_score.py train_test_split=navtrain_debug \
+    +debug=true \
+    +vocab_size=8192 \
+    +scene_filter_name=navtrain_debug \
+    experiment_name=debug_full_vocab_pdm_scoring_aug \
+    worker.threads_per_node=0 \
+    worker.debug_mode=true \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/debug/train/ori
+```
+
 ori debug (not debug mode)
 ```bash
 export PROGRESS_MODE=gen_gt; \
@@ -335,14 +362,14 @@ python navsim/agents/tools/gen_vocab_full_score.py train_test_split=navtrain_deb
 
 **ensemble**
 ```bash
-python navsim/agents/scripts/get_final.py --rot=30 --trans=0 --va=0 --percentage=0.5 --seed=2024
+python navsim/agents/tools/get_final_full_vocab_score.py --rot=30 --trans=0 --va=0 --percentage=0.5 --seed=2024
 
-python navsim/agents/scripts/get_final_ensemble_seeds.py --rot=30 --trans=0 --va=0 --percentage=0.5
+python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=30 --trans=0 --va=0 --percentage=0.5
 ```
 
 **split emsembles**
 ```bash
-python navsim/agents/scripts/split_final_ensemble_pickle.py --rot=30 --trans=0 --va=0.3 --percentage=0.5
+python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --trans=0 --va=0.3 --percentage=0.5
 ```
 
 
@@ -445,7 +472,7 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent=hydra_img_vit_ssl \
     experiment_name=debug \
     split=trainval \
-    scene_filter=navtrain_debug \
+    train_test_split=navtrain_debug \
     \~trainer.params.strategy \
     trainer.params.limit_train_batches=0.08 \
     trainer.params.limit_val_batches=0.20 \
@@ -458,10 +485,12 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.ego_perturb.rotation.enable=true \
     agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
     agent.config.student_rotation_ensemble=3 \
-    agent.config.soft_label_diff_thresh=1.0 \
-    agent.config.refinement.use_2_stage=true \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=2 \
+    agent.config.refinement.stage_layers="3+2" \
+    agent.config.refinement.topks="64+16" \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
-    agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0-p_0.5-ensemble_debug/split_pickles \
+    agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null
 ```
 

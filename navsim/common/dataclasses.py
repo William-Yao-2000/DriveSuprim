@@ -333,6 +333,8 @@ class Scene:
 
         start_frame_idx = self.scene_metadata.num_history_frames - 1
 
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         global_ego_poses = []
         for frame_idx in range(start_frame_idx, start_frame_idx + num_trajectory_frames + 1):
             global_ego_poses.append(self.frames[frame_idx].ego_status.ego_pose)
