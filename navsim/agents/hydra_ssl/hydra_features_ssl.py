@@ -430,8 +430,8 @@ class HydraSSLTargetBuilder(AbstractTargetBuilder):
                 rotated_poses = np.array(rotated_poses)
 
                 # Visualize both trajectories side by side
-                if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-                    _visualize_trajectories(future_traj.poses, rotated_poses, f'trajectory_comparison_{_reverse_rotation/np.pi*180:.2f}.png', '增强后的轨迹')
+                # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+                #     _visualize_trajectories(future_traj.poses, rotated_poses, f'trajectory_comparison_{_reverse_rotation/np.pi*180:.2f}.png', '增强后的轨迹')
 
                 rotated_trajectories.append(torch.tensor(rotated_poses))  # [num_poses, 3]
             else:
