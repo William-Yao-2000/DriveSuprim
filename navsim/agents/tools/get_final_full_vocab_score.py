@@ -21,6 +21,7 @@ if __name__ == '__main__':
     old_out_dir = 'random_aug/'
     parts = []
     parts.append(f'rot_{rot}-trans_{trans}')
+    va = int(va)
     parts.append(f'va_{va}')
     
     if len(parts) > 0:
@@ -32,7 +33,7 @@ if __name__ == '__main__':
     new_out_dir = f'{old_out_dir}/vocab_score_8192_navtrain_final'
     os.makedirs(f'{traj_root}/{new_out_dir}', exist_ok=True)
 
-    ins = [f'new_sub{i}' for i in range(1,66)]
+    ins = [f'ngc_sub{i}' for i in range(1,13)]
     out = 'navtrain.pkl'
 
     result = {}
