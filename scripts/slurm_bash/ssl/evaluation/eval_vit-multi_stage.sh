@@ -28,7 +28,7 @@ submit_job \
     --nodes 1 \
     -n "eval-navsim_ssl-$dir_name-${epoch}epoch" \
     --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
-    --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/evaluation/ \
+    --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/evaluation/ \
     --email_mode never \
     --duration 4 \
     --dependent_clones 0 \
