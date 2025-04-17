@@ -35,7 +35,7 @@ command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_s
     experiment_name=$dir \
     +resume_ckpt_path='$NAVSIM_EXP_ROOT/$dir/$resume' \
     split=trainval \
-    scene_filter=navtrain \
+    train_test_split=navtrain \
     dataloader.params.batch_size=$bs \
     ~trainer.params.strategy \
     trainer.params.max_epochs=$epoch \
