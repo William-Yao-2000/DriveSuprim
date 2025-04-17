@@ -1,20 +1,13 @@
 #!/bin/bash
 
-: '
-Usage: sh scripts/robust/evaluation/fix_angle_eval.sh [epoch] [dir] [fixed_angle]
-
-Arguments:
-    epoch           Training epoch number to evaluate (default: 19)
-    dir             Directory path (under $NAVSIM_EXP_ROOT) containing model checkpoints
-                    (default: "train/ego_perturbation/rot_30-trans_0-p_0.5/fixbug-v1/baseline")  
-'
-
 # Default values
 epoch=${1:-19}
 dir=${2:-"training/ssl/ori/lr_baseline"}
-num_top_k=${3:-64}
-inference_model="teacher"
+num_refinement_stage=$3
+stage_layers=$4
+topks=$5
 
+inference_model="teacher"
 
 # Format epoch with leading zero
 padded_epoch=$(printf "%02d" $epoch)
@@ -31,8 +24,6 @@ else
     experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}"
 fi
 
-experiment_name="${experiment_name}-check_k_${num_top_k}"
-
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
 python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     +debug=false \
@@ -44,14 +35,15 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     agent.config.training=false \
     agent.config.only_ori_input=true \
     agent.config.inference.model=${inference_model} \
-    agent.config.lab.check_top_k_traj=true \
-    agent.config.lab.num_top_k=$num_top_k \
-    agent.config.lab.test_full_vocab_pdm_score_path='${NAVSIM_TRAJPDM_ROOT}/ori/vocab_score_full_8192_navtest/navtest.pkl' \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=$num_refinement_stage \
+    agent.config.refinement.stage_layers=$stage_layers \
+    agent.config.refinement.topks=$topks \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
     split=test \
-    scene_filter=navtest
+    train_test_split=navtrain
 "
 
 echo "--- COMMAND ---"
