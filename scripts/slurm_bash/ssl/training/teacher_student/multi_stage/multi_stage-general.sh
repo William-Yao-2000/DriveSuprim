@@ -13,7 +13,7 @@ submit_job \
     --nodes 1 \
     -n "$dir_name" \
     --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
-    --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/training \
+    --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
     --email_mode never \
     --duration 4 \
     --dependent_clones 0 \
