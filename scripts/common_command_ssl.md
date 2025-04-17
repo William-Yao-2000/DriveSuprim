@@ -369,7 +369,7 @@ python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=30
 
 **split emsembles**
 ```bash
-python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --trans=0 --va=0.3 --percentage=0.5
+python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --trans=0 --va=0 --percentage=0.5
 ```
 
 

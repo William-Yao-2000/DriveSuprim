@@ -7,9 +7,14 @@ rot=30
 trans=0
 va=0
 probability=0.5
-dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/two_stage
 
-ckpt_epoch=$1
+num_refinement_stage=$1
+stage_layers=$2
+topks=$3
+
+dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/stage_layers_$stage_layers-topks_$topks
+
+ckpt_epoch=$4
 # Format epoch with leading zero
 padded_ckpt_epoch=$(printf "%02d" $ckpt_epoch)
 
@@ -22,6 +27,7 @@ if [ -z "$resume" ]; then
     echo -e "Wrong! You need to provide the resume model name!"
     exit 1
 fi
+
 
 command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=false \
@@ -41,7 +47,10 @@ command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_s
     agent.config.ego_perturb.rotation.enable=true \
     agent.config.ego_perturb.rotation.offline_aug_angle_boundary=$rot \
     agent.config.student_rotation_ensemble=3 \
-    agent.config.refinement.use_2_stage=true \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=$num_refinement_stage \
+    agent.config.refinement.stage_layers=$stage_layers \
+    agent.config.refinement.topks=$topks \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_full_8192_navtrain/navtrain.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_$rot-trans_$trans-va_$va-p_$probability-ensemble/split_pickles \
     cache_path=null
