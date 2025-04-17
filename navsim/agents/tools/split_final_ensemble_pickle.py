@@ -23,7 +23,7 @@ if __name__ == '__main__':
     old_out_dir_prefix = 'random_aug/'
     parts = []
     parts.append(f'rot_{rot}-trans_{trans}')
-    if (va == 0)
+    if va == 0:
         va = int(va)
     parts.append(f'va_{va}')
     
