@@ -33,6 +33,6 @@ done
 usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/multi_stage-general-resume_2ep.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-general-resume.sh \
-    2 3 256 \
+    1 3 256 \
     interactive
 '
