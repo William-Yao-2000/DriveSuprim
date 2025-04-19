@@ -1,9 +1,9 @@
 ## 1. testing
 ### 0. metric caching (ori / augmentation)
 ```bash
-python navsim/planning/script/run_metric_caching.py split=test scene_filter=navtest \
-    worker.threads_per_node=128 \
-    cache.cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori \
+python navsim/planning/script/run_metric_caching.py train_test_split=navtest \
+    worker.threads_per_node=192 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori \
     --config-name default_metric_caching
 ```
 
@@ -39,196 +39,42 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     agent.config.training=false \
     agent.config.only_ori_input=true \
     agent.config.inference.model=student \
-    agent.config.refinement.use_2_stage=true \
-    agent.config.lab.test_full_vocab_pdm_score_path='/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/hydramdp_cvpr24/dataset/traj_pdm/ori/vocab_score_8192_navtest_final/navtest.pkl' \
+    agent.config.refinement.use_multi_stage=true \
     agent.checkpoint_path='/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/ensemble_3-lr3x/epoch\=01-step\=2660.ckpt' \
     experiment_name=debug \
     +cache_path=null \
     metric_cache_path=/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp/metric_cache/test/ori \
-    split=test \
-    scene_filter=navtest
+    train_test_split=navtest
 ```
 
-
-### 2. camera_shutdown
+debug (v1)
 ```bash
-TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_robust.py \
-    +debug=false \
-    +use_pdm_closed=false \
-    agent=hydra_img_vov_robust \
-    dataloader.params.batch_size=8 \
-    worker.threads_per_node=128 \
-    agent.checkpoint_path=${NAVSIM_EXP_ROOT}/ckpt/hydra_img_vov.ckpt \
-    agent.config.camera_shutdown=True \
-    agent.config.camera_shutdown_mode=1 \
-    experiment_name=test/camera_shutdown/mode_1/p_1.0 \
-    +cache_path=null \
-    metric_cache_path=${NAVSIM_EXP_ROOT}/navtest_metric_cache \
-    split=test \
-    scene_filter=navtest
-```
-
-debug
-```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_robust.py \
+TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_v1.py \
     +debug=true \
     +use_pdm_closed=false \
-    agent=hydra_img_vov_robust \
-    dataloader.params.batch_size=8 \
+    agent=hydra_img_vit_ssl_v1 \
+    worker.threads_per_node=0 \
+    worker.debug_mode=true \
+    dataloader.params.batch_size=2 \
     dataloader.params.num_workers=0 \
     dataloader.params.pin_memory=false \
     dataloader.params.prefetch_factor=null \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    agent.checkpoint_path=${NAVSIM_EXP_ROOT}/ckpt/hydra_img_vov.ckpt \
-    agent.config.camera_shutdown=True \
-    agent.config.camera_shutdown_mode=1 \
-    experiment_name=debug \
-    +cache_path=null \
-    metric_cache_path=${NAVSIM_EXP_ROOT}/navtest_metric_cache \
-    split=test \
-    scene_filter=navtest_debug
-```
-
-### 3. camera noise
-debug
-```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_robust.py \
-    +debug=true \
-    +use_pdm_closed=false \
-    agent=hydra_img_vov_robust \
-    dataloader.params.batch_size=8 \
-    dataloader.params.num_workers=0 \
-    dataloader.params.pin_memory=false \
-    dataloader.params.prefetch_factor=null \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    agent.checkpoint_path=${NAVSIM_EXP_ROOT}/ckpt/hydra_img_vov.ckpt \
-    agent.config.camera_noise=True \
-    agent.config.camera_noise_percentage=0.3 \
-    experiment_name=debug \
-    +cache_path=null \
-    metric_cache_path=${NAVSIM_EXP_ROOT}/navtest_metric_cache \
-    split=test \
-    scene_filter=navtest_debug
-```
-
-
-### 4. ego_rotation
-#### crop from panoramic img
-```bash
-TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_robust.py \
-    +debug=false \
-    +use_pdm_closed=false \
-    agent=hydra_img_vov_robust \
-    dataloader.params.batch_size=8 \
-    worker.threads_per_node=128 \
-    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/train/ego_perturbation/rot_30-trans_0-p_0.5/fixbug-v1/traj_smooth/epoch\=05-step\=7980.ckpt" \
-    agent.config.ego_perturb.rotation.enable=true \
-    agent.config.ego_perturb.rotation.fixed_angle=0 \
-    agent.config.ego_perturb.rotation.crop_from_panoramic=true \
     agent.config.training=false \
-    experiment_name=train/ego_perturbation/rot_30-trans_0-p_0.5/fixbug-v1/traj_smooth/test-05ep \
+    agent.config.only_ori_input=true \
+    agent.config.inference.model=teacher \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    experiment_name=debug \
     +cache_path=null \
     metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/test/ori \
-    split=test \
-    scene_filter=navtest
+    train_test_split=navtest
 ```
 
 
-debug （参数可能对不上，只是为了演示）
-```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_robust.py \
-    +debug=true \
-    +use_pdm_closed=false \
-    agent=hydra_img_vov_robust \
-    dataloader.params.batch_size=8 \
-    dataloader.params.num_workers=0 \
-    dataloader.params.pin_memory=false \
-    dataloader.params.prefetch_factor=null \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    agent.checkpoint_path=${NAVSIM_EXP_ROOT}/ckpt/hydra_img_vov.ckpt \
-    agent.config.ego_perturb.mode=load_from_offline \
-    agent.config.ego_perturb.offline_aug_file=${NAVSIM_EXP_ROOT}/offline_files/testing_aug_files/rot_15-trans_0-va_0.3-wp_0.2-p_1.0.json \
-    agent.config.ego_perturb.rotation.enable=true \
-    agent.config.ego_perturb.rotation.offline_aug_angle_boundary=15 \
-    agent.config.ego_perturb.rotation.crop_from_panoramic=true \
-    agent.config.ego_perturb.va.enable=true \
-    agent.config.ego_perturb.va.offline_aug_boundary=0.3 \
-    agent.config.camera_problem.weather_enable=true \
-    agent.config.camera_problem.weather_aug_mode=load_from_offline \
-    agent.config.training=false \
-    experiment_name=debug \
-    +cache_path=null \
-    metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/test/fixed_aug/rot_15-trans_0-p_1.0 \
-    split=test \
-    scene_filter=navtest_debug
-```
-
-### 5. testing on augmented dataset
-#### 1-1. generate offline files
-```bash
-python navsim/agents/scripts/gen_offline_testing_aug_file.py --rot=0 --va=0.3
-```
-
-
-#### 2. metric caching
-虽然运行的是 run_metric_caching_aug_train.py，但实际上是在测试集上面 cache 的
-```bash
-python navsim/planning/script/run_metric_caching_aug_train.py split=test scene_filter=navtest \
-    +debug=false \
-    worker.threads_per_node=192 \
-    cache.cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/random_aug/M_2 \
-    aug_train.rotation=45 \
-    aug_train.va=0.5 \
-    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/testing_aug_files/rot_45-trans_0-va_0.5-wp_0.3-p_1.0.json \
-    --config-name metric_caching_aug_train
-```
-
-
-debug
-```bash
-python navsim/planning/script/run_metric_caching_aug_train.py split=test scene_filter=navtest \
-    +debug=true \
-    cache.cache_path=$NAVSIM_EXP_ROOT/debug \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    aug_train.rotation=15 \
-    aug_train.va=0 \
-    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/testing_aug_files/rot_15-trans_0-p_1.0.json \
-    --config-name metric_caching_aug_train
-```
-
-
-
-### --2. metric caching (augmentation)
-1. rotation
-```bash
-python navsim/planning/script/run_metric_caching_aug_test.py split=test scene_filter=navtest \
-    +debug=false \
-    worker.threads_per_node=128 \
-    cache.cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/fixed_aug/rot_-30-trans_0-p_1.0 \
-    augmentation.rotation=-30 \
-    --config-name metric_caching_aug
-```
-
-debug
-```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
-python navsim/planning/script/run_metric_caching_aug.py split=test scene_filter=navtest_debug \
-    +debug=true \
-    cache.cache_path=$NAVSIM_EXP_ROOT/debug \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    augmentation.rotation=20.0 \
-    --config-name metric_caching_aug
-```
 
 ## 2. training
 ### 0. generate offline augmentation file
