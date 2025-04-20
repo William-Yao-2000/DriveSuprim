@@ -12,6 +12,7 @@ from tqdm import tqdm
 from navsim.common.dataclasses import AgentInput
 from navsim.common.dataloader import SceneLoader
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
+from navsim.agents.hydra_ssl_v1.hydra_config_ssl import HydraConfigSSL
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ class DatasetSSL(torch.utils.data.Dataset):
         scene_loader: SceneLoader,
         feature_builders: List[AbstractFeatureBuilder],
         target_builders: List[AbstractTargetBuilder],
+        cfg: HydraConfigSSL,
         cache_path: Optional[str] = None,
         force_cache_computation: bool = False,
         append_token_to_batch: bool = False,
@@ -152,6 +154,7 @@ class DatasetSSL(torch.utils.data.Dataset):
         self._scene_loader = scene_loader
         self._feature_builders = feature_builders
         self._target_builders = target_builders
+        self._cfg = cfg
 
         self._cache_path: Optional[Path] = Path(cache_path) if cache_path else None
         self._force_cache_computation = force_cache_computation
@@ -303,7 +306,8 @@ class DatasetSSL(torch.utils.data.Dataset):
                     features.update(builder.compute_features(agent_input, scene))
                 else:
                     features.update(builder.compute_features(agent_input))
-            for builder in self._target_builders:
-                targets.update(builder.compute_targets(scene))
+            if self._cfg.training:
+                for builder in self._target_builders:
+                    targets.update(builder.compute_targets(scene))
 
         return (features, targets, token)
