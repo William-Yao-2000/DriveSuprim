@@ -6,7 +6,7 @@ import uuid
 from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import hydra
 import pandas as pd
@@ -26,9 +26,8 @@ from navsim.common.dataloader import MetricCacheLoader, SceneFilter, SceneLoader
 from navsim.common.enums import SceneFrameType
 from navsim.evaluate.pdm_score import pdm_score
 from navsim.planning.script.builders.worker_pool_builder import build_worker
-from navsim.planning.script.run_pdm_score import calculate_two_frame_extended_comfort, compute_final_scores, \
-    infer_two_stage_mapping, validate_two_stage_mapping, calculate_pseudo_closed_loop_weights, \
-    calculate_individual_mapping_scores
+from navsim.planning.script.run_pdm_score import compute_final_scores, calculate_weighted_average_score, \
+                                                 calculate_individual_mapping_scores, create_scene_aggregators
 from navsim.planning.simulation.planner.pdm_planner.scoring.pdm_scorer import PDMScorer
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
 from navsim.planning.training.agent_lightning_module import AgentLightningModule
@@ -62,63 +61,122 @@ def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]
     assert (
             simulator.proposal_sampling == scorer.proposal_sampling
     ), "Simulator and scorer proposal sampling has to be identical"
-    traffic_agents_policy: AbstractTrafficAgentsPolicy = instantiate(
-        cfg.traffic_agents_policy, simulator.proposal_sampling
-    )
+    # traffic_agents_policy: AbstractTrafficAgentsPolicy = instantiate(
+    #     cfg.traffic_agents_policy, simulator.proposal_sampling
+    # )
+    
     metric_cache_loader = MetricCacheLoader(Path(cfg.metric_cache_path))
     scene_filter: SceneFilter = instantiate(cfg.train_test_split.scene_filter)
     scene_filter.log_names = log_names
     scene_filter.tokens = tokens
     scene_loader = SceneLoader(
-        sensor_blobs_path=Path(cfg.sensor_blobs_path),
-        navsim_blobs_path=Path(cfg.navsim_blobs_path),
+        synthetic_sensor_path=Path(cfg.synthetic_sensor_path),
+        original_sensor_path=Path(cfg.original_sensor_path),
         data_path=Path(cfg.navsim_log_path),
         synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
         scene_filter=scene_filter,
     )
 
-    tokens_to_evaluate = list(set(scene_loader.tokens) & set(metric_cache_loader.tokens))
     pdm_results: List[pd.DataFrame] = []
 
-    for idx, (token) in enumerate(tokens_to_evaluate):
+    # first stage
+
+    traffic_agents_policy_stage_one: AbstractTrafficAgentsPolicy = instantiate(
+        cfg.traffic_agents_policy.reactive, simulator.proposal_sampling
+    )
+
+    scene_loader_tokens_stage_one = scene_loader.tokens_stage_one
+
+    tokens_to_evaluate_stage_one = list(set(scene_loader_tokens_stage_one) & set(metric_cache_loader.tokens))
+
+    for idx, (token) in enumerate(tokens_to_evaluate_stage_one):
         logger.info(
-            f"Processing scenario {idx + 1} / {len(tokens_to_evaluate)} in thread_id={thread_id}, node_id={node_id}"
+            f"Processing scenario {idx + 1} / {len(tokens_to_evaluate_stage_one)} in thread_id={thread_id}, node_id={node_id}"
         )
         try:
             metric_cache = metric_cache_loader.get_from_token(token)
             trajectory = model_trajectory[token]['trajectory']
-            score_row, ego_simulated_states = pdm_score(
+            score_row_stage_one, ego_simulated_states = pdm_score(
                 metric_cache=metric_cache,
                 model_trajectory=trajectory,
                 future_sampling=simulator.proposal_sampling,
                 simulator=simulator,
                 scorer=scorer,
-                traffic_agents_policy=traffic_agents_policy,
+                traffic_agents_policy=traffic_agents_policy_stage_one,
             )
-            score_row["valid"] = True
-            score_row["log_name"] = metric_cache.log_name
-            score_row["frame_type"] = metric_cache.scene_type
-            score_row["start_time"] = metric_cache.timepoint.time_s
+            score_row_stage_one["valid"] = True
+            score_row_stage_one["log_name"] = metric_cache.log_name
+            score_row_stage_one["frame_type"] = metric_cache.scene_type
+            score_row_stage_one["start_time"] = metric_cache.timepoint.time_s
             end_pose = StateSE2(
                 x=trajectory.poses[-1, 0],
                 y=trajectory.poses[-1, 1],
                 heading=trajectory.poses[-1, 2],
             )
             absolute_endpoint = relative_to_absolute_poses(metric_cache.ego_state.rear_axle, [end_pose])[0]
-            score_row["endpoint_x"] = absolute_endpoint.x
-            score_row["endpoint_y"] = absolute_endpoint.y
-            score_row["start_point_x"] = metric_cache.ego_state.rear_axle.x
-            score_row["start_point_y"] = metric_cache.ego_state.rear_axle.y
-            score_row["ego_simulated_states"] = [ego_simulated_states]  # used for two-frames extended comfort
+            score_row_stage_one["endpoint_x"] = absolute_endpoint.x
+            score_row_stage_one["endpoint_y"] = absolute_endpoint.y
+            score_row_stage_one["start_point_x"] = metric_cache.ego_state.rear_axle.x
+            score_row_stage_one["start_point_y"] = metric_cache.ego_state.rear_axle.y
+            score_row_stage_one["ego_simulated_states"] = [ego_simulated_states]  # used for two-frames extended comfort
 
         except Exception:
             logger.warning(f"----------- Agent failed for token {token}:")
             traceback.print_exc()
-            score_row = pd.DataFrame([PDMResults.get_empty_results()])
-            score_row["valid"] = False
-        score_row["token"] = token
+            score_row_stage_one = pd.DataFrame([PDMResults.get_empty_results()])
+            score_row_stage_one["valid"] = False
+        score_row_stage_one["token"] = token
 
-        pdm_results.append(score_row)
+        pdm_results.append(score_row_stage_one)
+
+    # second stage
+
+    traffic_agents_policy_stage_two: AbstractTrafficAgentsPolicy = instantiate(
+        cfg.traffic_agents_policy.reactive, simulator.proposal_sampling
+    )
+    scene_loader_tokens_stage_two = scene_loader.reactive_tokens_stage_two
+
+    tokens_to_evaluate_stage_two = list(set(scene_loader_tokens_stage_two) & set(metric_cache_loader.tokens))
+    for idx, (token) in enumerate(tokens_to_evaluate_stage_two):
+        logger.info(
+            f"Processing stage two reactive scenario {idx + 1} / {len(tokens_to_evaluate_stage_two)} in thread_id={thread_id}, node_id={node_id}"
+        )
+        try:
+            metric_cache = metric_cache_loader.get_from_token(token)
+            trajectory = model_trajectory[token]['trajectory']
+            score_row_stage_two, ego_simulated_states = pdm_score(
+                metric_cache=metric_cache,
+                model_trajectory=trajectory,
+                future_sampling=simulator.proposal_sampling,
+                simulator=simulator,
+                scorer=scorer,
+                traffic_agents_policy=traffic_agents_policy_stage_two,
+            )
+            score_row_stage_two["valid"] = True
+            score_row_stage_two["log_name"] = metric_cache.log_name
+            score_row_stage_two["frame_type"] = metric_cache.scene_type
+            score_row_stage_two["start_time"] = metric_cache.timepoint.time_s
+            end_pose = StateSE2(
+                x=trajectory.poses[-1, 0],
+                y=trajectory.poses[-1, 1],
+                heading=trajectory.poses[-1, 2],
+            )
+            absolute_endpoint = relative_to_absolute_poses(metric_cache.ego_state.rear_axle, [end_pose])[0]
+            score_row_stage_two["endpoint_x"] = absolute_endpoint.x
+            score_row_stage_two["endpoint_y"] = absolute_endpoint.y
+            score_row_stage_two["start_point_x"] = metric_cache.ego_state.rear_axle.x
+            score_row_stage_two["start_point_y"] = metric_cache.ego_state.rear_axle.y
+            score_row_stage_two["ego_simulated_states"] = [ego_simulated_states]  # used for two-frames extended comfort
+
+        except Exception:
+            logger.warning(f"----------- Agent failed for token {token}:")
+            traceback.print_exc()
+            score_row_stage_two = pd.DataFrame([PDMResults.get_empty_results()])
+            score_row_stage_two["valid"] = False
+        score_row_stage_two["token"] = token
+
+        pdm_results.append(score_row_stage_two)
+
     return pdm_results
 
 
@@ -137,11 +195,11 @@ def main(cfg: DictConfig) -> None:
     # Extract scenes based on scene-loader to know which tokens to distribute across workers
     scene_filter = instantiate(cfg.train_test_split.scene_filter)
     scene_loader_inference = SceneLoader(
-        sensor_blobs_path=Path(cfg.sensor_blobs_path),
+        synthetic_sensor_path=Path(cfg.synthetic_sensor_path),
+        original_sensor_path=Path(cfg.original_sensor_path),
         data_path=Path(cfg.navsim_log_path),
-        navsim_blobs_path=Path(cfg.navsim_blobs_path),
-        scene_filter=scene_filter,
         synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
+        scene_filter=scene_filter,
         sensor_config=agent.get_sensor_config(),
     )
     dataset = Dataset(
@@ -157,8 +215,8 @@ def main(cfg: DictConfig) -> None:
     # Extract scenes based on scene-loader to know which tokens to distribute across workers
     # TODO: infer the tokens per log from metadata, to not have to load metric cache and scenes here
     scene_loader = SceneLoader(
-        sensor_blobs_path=None,
-        navsim_blobs_path=None,
+        synthetic_sensor_path=None,
+        original_sensor_path=None,
         data_path=Path(cfg.navsim_log_path),
         synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
         scene_filter=scene_filter,
@@ -220,45 +278,21 @@ def main(cfg: DictConfig) -> None:
     score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score_wo_inference, data_points)
 
     pdm_score_df = pd.concat(score_rows)
-    old_pdms = (pdm_score_df['no_at_fault_collisions'] *
-                pdm_score_df['drivable_area_compliance'] *
-                ((5 * pdm_score_df['ego_progress'] +
-                  5 * pdm_score_df['time_to_collision_within_bound'] +
-                  2 * pdm_score_df['history_comfort']) / 12))
-    pdm_score_df['old_pdms'] = old_pdms
-    # Calculate two-frame extended comfort
-    two_frame_comfort_df = calculate_two_frame_extended_comfort(
-        pdm_score_df, proposal_sampling=instantiate(cfg.simulator.proposal_sampling)
-    )
-
-    # Merge two-frame comfort scores and drop unnecessary columns in one step
-    pdm_score_df = (
-        pdm_score_df.drop(columns=["ego_simulated_states"])  # Remove the unwanted column first
-        .merge(
-            two_frame_comfort_df[["current_token", "two_frame_extended_comfort"]],
-            left_on="token",
-            right_on="current_token",
-            how="left",
-        )
-        .drop(columns=["current_token"])  # Remove merged key after the merge
-    )
-
-    # Compute final scores
-    pdm_score_df = compute_final_scores(pdm_score_df)
-
+    
     try:
-        if hasattr(cfg.train_test_split, "two_stage_mapping"):
-            two_stage_mapping: Dict[str, List[str]] = dict(cfg.train_test_split.two_stage_mapping)
-        else:
-            # infer two stage mapping from results
-            two_stage_mapping = infer_two_stage_mapping(pdm_score_df, first_stage_duration=4.0)
-        validate_two_stage_mapping(pdm_score_df, two_stage_mapping)
+        raw_mapping = cfg.train_test_split.reactive_all_mapping
+        all_mappings: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
 
-        # calculate weights for pseudo closed loop using config
-        weights = calculate_pseudo_closed_loop_weights(pdm_score_df, two_stage_mapping=two_stage_mapping)
-        assert len(weights) == len(pdm_score_df), "Couldn't calculate weights for all tokens."
-        pdm_score_df = pdm_score_df.merge(weights, on="token")
+        for orig_token, prev_token, two_stage_pairs in raw_mapping:
+            if prev_token in set(scene_loader.tokens) or orig_token in set(scene_loader.tokens):
+                all_mappings[(orig_token, prev_token)] = [tuple(pair) for pair in two_stage_pairs]
+
+        pdm_score_df = create_scene_aggregators(
+            all_mappings, pdm_score_df, instantiate(cfg.simulator.proposal_sampling)
+        )
+        pdm_score_df = compute_final_scores(pdm_score_df)
         pseudo_closed_loop_valid = True
+
     except Exception:
         logger.warning("----------- Failed to calculate pseudo closed-loop weights:")
         traceback.print_exc()
@@ -268,7 +302,7 @@ def main(cfg: DictConfig) -> None:
     num_sucessful_scenarios = pdm_score_df["valid"].sum()
     num_failed_scenarios = len(pdm_score_df) - num_sucessful_scenarios
     if num_failed_scenarios > 0:
-        failed_tokens = pdm_score_df[not pdm_score_df["valid"]]["token"].to_list()
+        failed_tokens = pdm_score_df[~pdm_score_df["valid"]]["token"].to_list()
     else:
         failed_tokens = []
 
@@ -276,35 +310,34 @@ def main(cfg: DictConfig) -> None:
         c
         for c in pdm_score_df.columns
         if (
-                (any(score.name in c for score in
-                     fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score" or c == 'old_pdms')
-                and c != "pdm_score"
+            (any(score.name in c for score in fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score")
+            and c != "pdm_score"
         )
     ]
 
-    # Calculate average score
-    average_row = pdm_score_df[score_cols].mean(skipna=True)
-    average_row["token"] = "average_all_frames"
-    average_row["valid"] = pdm_score_df["valid"].all()
+    # Calculate average score of all frames
+    average_all_frames_extended_pdm_score_row = pdm_score_df[score_cols].mean(skipna=True)
+    average_all_frames_extended_pdm_score_row["token"] = "average_all_frames_extended_pdm_score"
+    average_all_frames_extended_pdm_score_row["valid"] = pdm_score_df["valid"].all()
 
     # Calculate pseudo closed loop score with weighted average
-    pseudo_closed_loop_row = calculate_individual_mapping_scores(
-        pdm_score_df[score_cols + ["token", "weight"]], two_stage_mapping
+    extended_pdm_score_row = calculate_individual_mapping_scores(
+        pdm_score_df[score_cols + ["token", "weight"]], all_mappings
     )
-    pseudo_closed_loop_row["token"] = "pseudo_closed_loop"
-    pseudo_closed_loop_row["valid"] = pseudo_closed_loop_valid
+    extended_pdm_score_row["token"] = "extended_pdm_score"
+    extended_pdm_score_row["valid"] = pseudo_closed_loop_valid
 
     # Original frames average
     original_frames = pdm_score_df[pdm_score_df["frame_type"] == SceneFrameType.ORIGINAL]
-    average_original_row = original_frames[score_cols].mean(skipna=True)
-    average_original_row["token"] = "average_expert_frames"
-    average_original_row["valid"] = original_frames["valid"].all()
+    average_expert_frames_extended_pdm_score_row = original_frames[score_cols].mean(skipna=True)
+    average_expert_frames_extended_pdm_score_row["token"] = "average_expert_frames_extended_pdm_score"
+    average_expert_frames_extended_pdm_score_row["valid"] = original_frames["valid"].all()
 
     # append average and pseudo closed loop scores
     pdm_score_df = pdm_score_df[["token", "valid"] + score_cols]
-    pdm_score_df.loc[len(pdm_score_df)] = average_row
-    pdm_score_df.loc[len(pdm_score_df)] = pseudo_closed_loop_row
-    pdm_score_df.loc[len(pdm_score_df)] = average_original_row
+    pdm_score_df.loc[len(pdm_score_df)] = average_all_frames_extended_pdm_score_row
+    pdm_score_df.loc[len(pdm_score_df)] = average_expert_frames_extended_pdm_score_row
+    pdm_score_df.loc[len(pdm_score_df)] = extended_pdm_score_row
 
     save_path = Path(cfg.output_dir)
     timestamp = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
@@ -315,8 +348,7 @@ def main(cfg: DictConfig) -> None:
         Finished running evaluation.
             Number of successful scenarios: {num_sucessful_scenarios}.
             Number of failed scenarios: {num_failed_scenarios}.
-            Final average score of valid results: {pdm_score_df['score'].mean()}.
-            Final old PDMS: {pdm_score_df['old_pdms'].mean()}.
+            Final extended pdm score of valid results: {pdm_score_df[pdm_score_df["token"] == "extended_pdm_score"]["score"].iloc[0]}.
             Results are stored in: {save_path / f"{timestamp}.csv"}.
         """
     )
