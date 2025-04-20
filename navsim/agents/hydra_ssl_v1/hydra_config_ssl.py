@@ -105,6 +105,7 @@ class LabConfig:
     check_top_k_traj: bool = False
     num_top_k: int = 64
     test_full_vocab_pdm_score_path: str = "???"
+    use_first_stage_traj_in_infer: bool = False
 
 
 @dataclass

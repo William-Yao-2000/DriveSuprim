@@ -39,7 +39,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     agent.config.refinement.num_refinement_stage=$num_refinement_stage \
     agent.config.refinement.stage_layers=$stage_layers \
     agent.config.refinement.topks=$topks \
-    agent.config.lab.use_first_stage_traj_in_infer=true \
+    agent.config.lab.use_first_stage_traj_in_infer=false \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
