@@ -210,7 +210,7 @@ def main(cfg: DictConfig) -> None:
         scene_loader=scene_loader_inference,
         feature_builders=agent.get_feature_builders(),
         target_builders=agent.get_target_builders(),
-        cfg=cfg.agent.cfg,
+        cfg=cfg.agent.config,
         cache_path=None,
         force_cache_computation=False,
         append_token_to_batch=True
