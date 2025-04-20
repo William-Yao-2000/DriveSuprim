@@ -3,13 +3,12 @@
 <p align="center">
   <img src="assets/navsim_transparent.png" width="600">
   <h2 align="center">Data-Driven Non-Reactive Autonomous Vehicle Simulation and Benchmarking</h1>
-  <h3 align="center"><a href="https://arxiv.org/abs/2406.15349">Paper</a> | <a href="https://danieldauner.github.io/assets/pdf/Dauner2024NIPS_supplementary.pdf">Supplementary</a> | <a href="https://www.youtube.com/watch?v=Qe76HRmPDe0">Talk</a> | <a href="https://opendrivelab.com/challenge2024/#end_to_end_driving_at_scale">2024 Challenge</a> | <a href="https://huggingface.co/spaces/AGC2024-P/e2e-driving-navsim">Leaderboard v1.1</a> | <a href="https://huggingface.co/spaces/AGC2025/e2e-driving-warmup">Warmup Leaderboard v2.0</a> </h3>
+  <h3 align="center"><a href="https://arxiv.org/abs/2406.15349">Paper</a> | <a href="https://danieldauner.github.io/assets/pdf/Dauner2024NIPS_supplementary.pdf">Supplementary</a> | <a href="https://www.youtube.com/watch?v=Qe76HRmPDe0">Talk</a> | <a href="https://opendrivelab.com/challenge2024/#end_to_end_driving_at_scale">2024 Challenge</a> | <a href="https://huggingface.co/spaces/AGC2024-P/e2e-driving-navsim">Leaderboard v1.1</a> | <a href="https://huggingface.co/spaces/AGC2025/e2e-driving-warmup">Warmup Leaderboard v2.1</a> </h3>
 </p>
 
 </div>
 
 <br/>
-
 
 > [**NAVSIM: Data-Driven Non-Reactive Autonomous Vehicle Simulation and Benchmarking**](https://arxiv.org/abs/2406.15349)
 >
@@ -39,7 +38,6 @@
 4. [License and citation](#licenseandcitation)
 5. [Other resources](#otherresources)
 
-
 ## Getting started <a name="gettingstarted"></a>
 
 - [Download and installation](docs/install.md)
@@ -52,9 +50,16 @@
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
 ## Changelog <a name="changelog"></a>
-- **`[2025/02/28]`** NAVSIM v2.0 release (official devkit version for 2025 warm-up phase)
+- **`[2025/04/13]`** NAVSIM v2.1.1 release (official devkit version for 2025 warm-up phase)
+  - Updated dataset for the [Hugging Face Warmup leaderboard](https://huggingface.co/spaces/AGC2025/e2e-driving-warmup) with minor fixes
+
+    - ⚠️ **IMPORTANT**: To submit to the updated leaderboard, you need to re-download the synthetic dataset v2.1.1 (see [download](docs/install.md))
+
+- **`[2025/04/08]`** NAVSIM v2.1 release 
+  - Added new dataset for the [Hugging Face Warmup leaderboard](https://huggingface.co/spaces/AGC2025/e2e-driving-warmup) (see [submission](docs/submission.md))
+  - Introduced support for two-stage reactive traffic agents (see [traffic simulation](docs/metrics.md))
+- **`[2025/02/28]`** NAVSIM v2.0 release
   - Extends the PDM Score with more metrics and penalties (see [metrics](docs/metrics.md))
   - Adds a new two-stage pseudo closed-loop simulation (see [metrics](docs/metrics.md))
   - Adds support for reactive traffic agent policies (see [traffic simulation](docs/metrics.md))
@@ -62,7 +67,6 @@
   - Leaderboard for `navtest` on [Hugging Face](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navsim)
   - Release of baseline checkpoints on [Hugging Face](https://huggingface.co/autonomousvision/navsim_baselines)
   - Updated docs for [submission](docs/submission.md) and [paper](https://arxiv.org/abs/2406.15349)
-  - Code refactoring, formatting, minor fixes
 - **`[2024/04/21]`** NAVSIM v1.0 release (official devkit version for [AGC 2024](https://opendrivelab.com/challenge2024/#end_to_end_driving_at_scale))
   - Parallelization of metric caching / evaluation
   - Adds [Transfuser](https://arxiv.org/abs/2205.15997) baseline (see [agents](docs/agents.md#Baselines))
@@ -82,11 +86,10 @@
   - OpenScene-mini sensor blobs and annotation logs
   - Naive `ConstantVelocity` agent
 
-
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
 ## License and citation <a name="licenseandcitation"></a>
+
 All assets and code in this repository are under the [Apache 2.0 license](./LICENSE) unless specified otherwise. The datasets (including nuPlan and OpenScene) inherit their own distribution licenses. Please consider citing our paper and project if they help your research.
 
 ```BibTeX
@@ -108,7 +111,6 @@ All assets and code in this repository are under the [Apache 2.0 license](./LICE
 ```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
 
 ## Other resources <a name="otherresources"></a>
 
