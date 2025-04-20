@@ -1,9 +1,17 @@
 ## 1. testing
-### 0. metric caching (ori / augmentation)
+### 0-1. metric caching (ori)
 ```bash
 python navsim/planning/script/run_metric_caching.py train_test_split=navtest \
     worker.threads_per_node=192 \
     metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori \
+    --config-name default_metric_caching
+```
+
+### 0-2. metric caching (warmup_two_stage)
+```bash
+python navsim/planning/script/run_metric_caching.py train_test_split=warmup_two_stage \
+    worker.threads_per_node=192 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/warmup_two_stage \
     --config-name default_metric_caching
 ```
 
@@ -72,6 +80,80 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_v1.py \
     +cache_path=null \
     metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/test/ori \
     train_test_split=navtest
+```
+
+### 2. warmup_two_stage
+debug (v2, not debug mode)
+```bash
+TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl.py \
+    +debug=false \
+    +use_pdm_closed=false \
+    agent=hydra_img_vit_ssl_v1 \
+    dataloader.params.batch_size=2 \
+    agent.config.training=false \
+    agent.config.only_ori_input=true \
+    agent.config.inference.model=teacher \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    experiment_name=debug \
+    +cache_path=null \
+    metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/warmup_two_stage \
+    train_test_split=warmup_two_stage
+```
+
+
+debug (v1)
+```bash
+TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_v1.py \
+    +debug=true \
+    +use_pdm_closed=false \
+    agent=hydra_img_vit_ssl_v1 \
+    worker.threads_per_node=0 \
+    worker.debug_mode=true \
+    dataloader.params.batch_size=2 \
+    dataloader.params.num_workers=0 \
+    dataloader.params.pin_memory=false \
+    dataloader.params.prefetch_factor=null \
+    agent.config.training=false \
+    agent.config.only_ori_input=true \
+    agent.config.inference.model=teacher \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    experiment_name=debug \
+    +cache_path=null \
+    metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/warmup_two_stage \
+    train_test_split=warmup_two_stage
+```
+
+
+debug (v1, not debug mode)
+```bash
+TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_v1.py \
+    +debug=false \
+    +use_pdm_closed=false \
+    agent=hydra_img_vit_ssl_v1 \
+    dataloader.params.batch_size=2 \
+    agent.config.training=false \
+    agent.config.only_ori_input=true \
+    agent.config.inference.model=teacher \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    experiment_name=debug \
+    +cache_path=null \
+    metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/warmup_two_stage \
+    train_test_split=warmup_two_stage
 ```
 
 
