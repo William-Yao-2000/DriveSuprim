@@ -133,6 +133,8 @@ config:
     num_top_k: 64
     test_full_vocab_pdm_score_path: "aaa"
     use_first_stage_traj_in_infer: false
+    change_loss_weight: false
+    use_imi_learning_in_refinement: false
 
 
 checkpoint_path: null
