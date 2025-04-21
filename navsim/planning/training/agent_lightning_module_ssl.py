@@ -76,8 +76,8 @@ class AgentLightningModuleSSL(pl.LightningModule):
             self.log(f"{logging_prefix}/loss-aug", aug_loss[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + aug_loss[0]
         
-            if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-                import pdb; pdb.set_trace()
+            # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            #     import pdb; pdb.set_trace()
 
             loss_soft_teacher = self.agent.compute_loss_soft_teacher(teacher_pred, student_preds[0], targets, tokens)
             for k, v in loss_soft_teacher[1].items():

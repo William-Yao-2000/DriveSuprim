@@ -276,27 +276,25 @@ class HydraTrajHead(nn.Module):
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
         result = {}
-        # selected_indices: B,
+        # BUG!!!!!!!! (FIXED in 2025.04.21)
         for k, head in self.heads.items():
-            if k == 'imi':
-                result[k] = head(dist_status).squeeze(-1)  # [b, n_vocab]
-            else:
-                result[k] = head(dist_status).squeeze(-1).sigmoid()
+            result[k] = head(dist_status).squeeze(-1)
+
         scores = (
-            0.03 * result['imi'].softmax(-1).log() +
+            0.02 * result['imi'].softmax(-1).log() +
             0.1 * result['traffic_light_compliance'].sigmoid().log() +
-            0.1 * result['no_at_fault_collisions'].sigmoid().log() +
-            0.9 * result['drivable_area_compliance'].sigmoid().log() +
-            0.2 * result['driving_direction_compliance'].sigmoid().log() +
-            6.0 * (7.0 * result['time_to_collision_within_bound'].sigmoid() +
-                   7.0 * result['ego_progress'].sigmoid() +
-                   3.0 * result['lane_keeping'].sigmoid() +
+            0.5 * result['no_at_fault_collisions'].sigmoid().log() +
+            0.5 * result['drivable_area_compliance'].sigmoid().log() +
+            0.3 * result['driving_direction_compliance'].sigmoid().log() +
+            6.0 * (5.0 * result['time_to_collision_within_bound'].sigmoid() +
+                   5.0 * result['ego_progress'].sigmoid() +
+                   2.0 * result['lane_keeping'].sigmoid() +
                    1.0 * result['history_comfort'].sigmoid()
                    ).log()
         )
@@ -419,6 +417,15 @@ class TrajOffsetHead(nn.Module):
                 nn.Linear(d_ffn, 1),
             ),
         })
+        if self._config.lab.use_imi_learning_in_refinement:
+            heads['imi'] = nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            )
+
         if self.use_separate_stage_heads:
             self.multi_stage_heads = nn.ModuleList([copy.deepcopy(heads) for _ in range(num_stage)])
         else:
@@ -439,8 +446,8 @@ class TrajOffsetHead(nn.Module):
         # status_encoding: bs, topk, c
         # coarse_scores: dict
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         B = bev_feat_fg.shape[0]
         
@@ -458,12 +465,14 @@ class TrajOffsetHead(nn.Module):
                 for k, head in self.multi_stage_heads[i].items():
                     if self.use_offset_refinement:
                         # Compute offset and apply to reference using inverse sigmoid
-                        offset = head(dist_status).squeeze(-1)
                         # inverse_sigmoid(reference) + offset, then sigmoid
-                        reference_inv = _inverse_sigmoid(reference[k])
-                        layer_result[k] = torch.sigmoid(reference_inv + offset)
-                        # Update reference for next layer
-                        reference[k] = layer_result[k]
+                        if k != 'imi':
+                            offset = head(dist_status).squeeze(-1)
+                            layer_result[k] = reference[k] + offset
+                            # Update reference for next layer
+                            reference[k] = layer_result[k]
+                        else:
+                            layer_result[k] = head(dist_status).squeeze(-1)
                     else:
                         layer_result[k] = torch.sigmoid(head(dist_status).squeeze(-1))
                 layer_results.append(layer_result)
@@ -475,15 +484,17 @@ class TrajOffsetHead(nn.Module):
             last_layer_result = layer_results[-1]
             scores = (
                 0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
-                0.1 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
-                0.9 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
-                0.2 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
-                6.0 * (7.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
-                        7.0 * last_layer_result['ego_progress'].sigmoid() +
-                        3.0 * last_layer_result['lane_keeping'].sigmoid() +
-                        1.0 * last_layer_result['history_comfort'].sigmoid()
-                        ).log()
+                0.5 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
+                0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                0.3 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
+                6.0 * (5.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
+                       5.0 * last_layer_result['ego_progress'].sigmoid() +
+                       2.0 * last_layer_result['lane_keeping'].sigmoid() +
+                       1.0 * last_layer_result['history_comfort'].sigmoid()
+                       ).log()
             )
+            if self._config.lab.use_imi_learning_in_refinement:
+                scores += 0.02 * last_layer_result['imi'].softmax(-1).log()
 
             if i != self.num_stage-1:
                 _next_layer_dict = {}

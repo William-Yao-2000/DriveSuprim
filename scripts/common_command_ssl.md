@@ -1,9 +1,9 @@
 ## 1. testing
-### 0-1. metric caching (ori)
+### 0-1. metric caching (ori-two_stage)
 ```bash
-python navsim/planning/script/run_metric_caching.py train_test_split=navtest \
+python navsim/planning/script/run_metric_caching.py train_test_split=navtest_two_stage \
     worker.threads_per_node=192 \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori-two_stage \
     --config-name default_metric_caching
 ```
 
@@ -344,53 +344,6 @@ sh scripts/robust/training/node_aug.sh
 
 debug (只是为了测试，有可能参数之间并没有相符/对齐)
 
-only student, only ori input
-```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
-python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
-    +debug=true \
-    agent=hydra_img_vit_ssl \
-    experiment_name=debug \
-    split=trainval \
-    scene_filter=navtrain_debug \
-    \~trainer.params.strategy \
-    dataloader.params.batch_size=2 \
-    dataloader.params.num_workers=0 \
-    dataloader.params.pin_memory=false \
-    dataloader.params.prefetch_factor=null \
-    agent.config.ego_perturb.mode=load_from_offline \
-    agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_0-trans_0-p_0.0.json \
-    agent.config.ego_perturb.rotation.enable=false \
-    agent.config.ego_perturb.rotation.offline_aug_angle_boundary=0 \
-    agent.config.only_ori_input=true \
-    agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
-    cache_path=null
-```
-
-only student, ori input + rotate input (3-ensemble)
-```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
-python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
-    +debug=true \
-    agent=hydra_img_vit_ssl \
-    experiment_name=debug \
-    split=trainval \
-    scene_filter=navtrain_debug \
-    \~trainer.params.strategy \
-    dataloader.params.batch_size=2 \
-    dataloader.params.num_workers=0 \
-    dataloader.params.pin_memory=false \
-    dataloader.params.prefetch_factor=null \
-    agent.config.ego_perturb.mode=load_from_offline \
-    agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-ensemble.json \
-    agent.config.ego_perturb.rotation.enable=true \
-    agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
-    agent.config.student_rotation_ensemble=3 \
-    agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
-    agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0-p_0.5-ensemble_debug/split_pickles \
-    cache_path=null
-```
-
 teacher + student, ori input + rotate input (3-ensemble)
 其实跟上面没什么变化，只是代码变了
 ```bash
@@ -414,9 +367,11 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
     agent.config.student_rotation_ensemble=3 \
     agent.config.refinement.use_multi_stage=true \
-    agent.config.refinement.num_refinement_stage=2 \
-    agent.config.refinement.stage_layers="3+2" \
-    agent.config.refinement.topks="64+16" \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=64 \
+    agent.config.lab.change_loss_weight=true \
+    agent.config.lab.use_imi_learning_in_refinement=true \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null

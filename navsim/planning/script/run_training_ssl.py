@@ -56,24 +56,18 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[DatasetSSL, D
         val_scene_filter.log_names = cfg.val_logs
 
     data_path = Path(cfg.navsim_log_path)
-    sensor_blobs_path = Path(cfg.sensor_blobs_path)
-    navsim_blobs_path = Path(cfg.navsim_blobs_path)
-    synthetic_scenes_path = Path(cfg.synthetic_scenes_path)
+    original_sensor_path = Path(cfg.original_sensor_path)
 
     train_scene_loader = SceneLoader(
-        sensor_blobs_path=sensor_blobs_path,
-        navsim_blobs_path=navsim_blobs_path,
+        original_sensor_path=original_sensor_path,
         data_path=data_path,
-        synthetic_scenes_path=synthetic_scenes_path,
         scene_filter=train_scene_filter,
         sensor_config=agent.get_sensor_config(),
     )
 
     val_scene_loader = SceneLoader(
-        sensor_blobs_path=sensor_blobs_path,
-        navsim_blobs_path=navsim_blobs_path,
+        original_sensor_path=original_sensor_path,
         data_path=data_path,
-        synthetic_scenes_path=synthetic_scenes_path,
         scene_filter=val_scene_filter,
         sensor_config=agent.get_sensor_config(),
     )
@@ -82,6 +76,7 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[DatasetSSL, D
         scene_loader=train_scene_loader,
         feature_builders=agent.get_feature_builders(),
         target_builders=agent.get_target_builders(),
+        cfg=cfg.agent.config,
         cache_path=cfg.cache_path,
         force_cache_computation=cfg.force_cache_computation,
     )
@@ -90,6 +85,7 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[DatasetSSL, D
         scene_loader=val_scene_loader,
         feature_builders=agent.get_feature_builders(),
         target_builders=agent.get_target_builders(),
+        cfg=cfg.agent.config,
         cache_path=cfg.cache_path,
         force_cache_computation=cfg.force_cache_computation,
     )
