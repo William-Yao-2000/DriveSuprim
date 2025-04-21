@@ -233,12 +233,12 @@ class HydraAgentSSL(AbstractAgent):
         scores = {}
         revised_scores = {}
         for k in self.metrics:
-            if k == 'dd':
-                continue
+            # if k == 'dd':
+            #     continue
             tmp = [self.ori_vocab_pdm_score_full[token][k][None] for token in tokens]
             scores[k] = torch.from_numpy(np.concatenate(tmp, axis=0)).to(teacher_pred['trajectory'].device).float()
             # Calculate difference and clamp to max 0.2
-            diff = teacher_pred[k] - scores[k]
+            diff = teacher_pred[k].sigmoid() - scores[k]
             clamped_diff = torch.clamp(diff, min=-0.15, max=0.15)
             # Apply clamped adjustment to original scores
             revised_scores[k] = scores[k] + clamped_diff
