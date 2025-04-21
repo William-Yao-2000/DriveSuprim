@@ -19,7 +19,7 @@ metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep"
+    experiment_name="${dir}/test-${padded_epoch}ep-two_stage"
 else
     experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}"
 fi
