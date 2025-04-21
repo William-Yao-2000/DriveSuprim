@@ -106,6 +106,8 @@ class LabConfig:
     num_top_k: int = 64
     test_full_vocab_pdm_score_path: str = "???"
     use_first_stage_traj_in_infer: bool = False
+    change_loss_weight: bool = False
+    use_imi_learning_in_refinement: bool = False
 
 
 @dataclass

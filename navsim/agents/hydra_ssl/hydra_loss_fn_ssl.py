@@ -34,8 +34,8 @@ def hydra_kd_imi_agent_loss_robust(
     )
     history_comfort = predictions['history_comfort']
     imi = predictions['imi']
-    # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-    #     import pdb; pdb.set_trace()
+    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        import pdb; pdb.set_trace()
     _dtype = imi.dtype
 
     # 2 cls
@@ -111,7 +111,7 @@ def hydra_kd_imi_agent_loss_robust(
 
 
 def hydra_kd_imi_agent_loss_single_stage(
-        predictions: Dict[str, torch.Tensor], config: HydraConfigSSL, vocab_pdm_score
+        predictions: Dict[str, torch.Tensor], config: HydraConfigSSL, vocab_pdm_score, targets=None
 ):
     """
     Helper function calculating complete loss of Transfuser
@@ -121,8 +121,8 @@ def hydra_kd_imi_agent_loss_single_stage(
     :return: combined loss value
     """
 
-    # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-    #     import pdb; pdb.set_trace()
+    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        import pdb; pdb.set_trace()
     
     layer_results = predictions['layer_results']
     losses = {}
@@ -160,8 +160,26 @@ def hydra_kd_imi_agent_loss_single_stage(
         comfort_loss = F.binary_cross_entropy_with_logits(history_comfort,
                                                         vocab_pdm_score['history_comfort'].to(_dtype))
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if config.lab.use_imi_learning_in_refinement:
+            imi = layer_result['imi']
+            vocab = predictions["trajectory_vocab"]
+            # B, 8 (4 secs, 0.5Hz), 3
+            target_traj = targets["trajectory"]
+            # 4, 9, ..., 39
+            sampled_timepoints = [5 * k - 1 for k in range(1, 9)]
+            indices_absolute = predictions['indices_absolute']
+            l2_distance = -((vocab[:, sampled_timepoints][indices_absolute] - target_traj[:, None]) ** 2) / config.sigma
+            """
+            vocab: [vocab_size, 40, 3]
+            vocab[:, sampled_timepoints]: [vocab_size, 8, 3]
+            vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1): [b, vocab_size, 8, 3]
+            target_traj[:, None]: [b, 1, 8, 3]
+            l2_distance: [b, vocab_size, 8, 3]
+            """
+            imi_loss = F.cross_entropy(imi, l2_distance.sum((-2, -1)).softmax(1))
+
+            imi_loss_final = config.trajectory_imi_weight * imi_loss
+
 
         noc_loss_final = config.trajectory_pdm_weight['no_at_fault_collisions'] * noc_loss
         da_loss_final = config.trajectory_pdm_weight['drivable_area_compliance'] * da_loss
@@ -182,6 +200,9 @@ def hydra_kd_imi_agent_loss_single_stage(
             + tl_loss_final
             + comfort_loss_final
         )
+        if config.lab.use_imi_learning_in_refinement:
+            loss += imi_loss_final
+        
         total_loss += loss
         losses[f'layer_{layer+1}'] = loss
 
