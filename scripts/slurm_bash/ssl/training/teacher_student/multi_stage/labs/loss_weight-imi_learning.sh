@@ -16,11 +16,11 @@ done
 dir_name=$(echo $bash_file-multi_stage_lab | tr '/' '-' | tr '.' 'dot')
 
 if [ "$change_loss_weight" = "true" ]; then
-    dir="$dir-change_loss_weight"
+    dir_name="$dir_name-change_loss_weight"
 fi
 
 if [ "$use_imi_learning_in_refinement" = "true" ]; then
-    dir="$dir-use_imi_learning_in_refinement"
+    dir_name="$dir_name-use_imi_learning_in_refinement"
 fi
 
 submit_job \
@@ -42,6 +42,6 @@ submit_job \
 usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs/loss_weight-imi_learning.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/loss_weight-imi_learning.sh \
-    interactive \
-    -change_loss_weight=true -use_imi_learning_in_refinement=false
+    interactive_singlenode \
+    -change_loss_weight=false -use_imi_learning_in_refinement=true
 '
