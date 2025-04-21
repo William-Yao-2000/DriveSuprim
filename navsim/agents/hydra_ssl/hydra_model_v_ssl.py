@@ -466,13 +466,13 @@ class TrajOffsetHead(nn.Module):
                     if self.use_offset_refinement:
                         # Compute offset and apply to reference using inverse sigmoid
                         # inverse_sigmoid(reference) + offset, then sigmoid
-                        if k != 'imi':
-                            offset = head(dist_status).squeeze(-1)
-                            layer_result[k] = reference[k] + offset
-                            # Update reference for next layer
-                            reference[k] = layer_result[k]
-                        else:
-                            layer_result[k] = head(dist_status).squeeze(-1)
+                        # if k != 'imi':
+                        #     offset = head(dist_status).squeeze(-1)
+                        #     layer_result[k] = reference[k] + offset
+                        #     # Update reference for next layer
+                        #     reference[k] = layer_result[k]
+                        # else:
+                        layer_result[k] = head(dist_status).squeeze(-1)
                     else:
                         layer_result[k] = torch.sigmoid(head(dist_status).squeeze(-1))
                 layer_results.append(layer_result)
