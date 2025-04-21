@@ -55,6 +55,17 @@ class HydraAgentSSL(AbstractAgent):
             'traffic_light_compliance': 3.0,
             'history_comfort': 1.0,
         }
+        if config.lab.change_loss_weight:
+            config.trajectory_pdm_weight = {
+                'no_at_fault_collisions': 1.5,
+                'drivable_area_compliance': 1.5,
+                'time_to_collision_within_bound': 1.5,
+                'ego_progress': 2.0,
+                'driving_direction_compliance': 1.0,
+                'lane_keeping': 2.0,
+                'traffic_light_compliance': 1.0,
+                'history_comfort': 1.0,
+            }
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
         self._config = config
@@ -273,8 +284,10 @@ class HydraAgentSSL(AbstractAgent):
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+
+        trajectory_vocab = predictions[0]['trajectory_vocab']
 
         result_dict = dict()
         # ori
@@ -292,7 +305,11 @@ class HydraAgentSSL(AbstractAgent):
                 batch_size, topk = selected_indices_i.shape
                 batch_indices = torch.arange(batch_size, device=selected_indices_i.device).unsqueeze(1).expand(-1, topk)
                 scores[k] = full_scores[batch_indices, selected_indices_i]  # [bs, topk_stage_i]
-            ori_loss_i = hydra_kd_imi_agent_loss_single_stage(pred_i, self._config, scores)
+            _kwargs = {}
+            if self._config.lab.use_imi_learning_in_refinement:
+                _kwargs['targets'] = { 'trajectory': targets['ori_trajectory'] }
+                pred_i['trajectory_vocab'] = trajectory_vocab
+            ori_loss_i = hydra_kd_imi_agent_loss_single_stage(pred_i, self._config, scores, **_kwargs)
             ori_loss_lst.append(ori_loss_i)
         total_ori_loss = sum([loss_tup[0] for loss_tup in ori_loss_lst])
         total_ori_loss_dict = {}
@@ -323,7 +340,11 @@ class HydraAgentSSL(AbstractAgent):
                     batch_size, topk = aug_idx_selected_indices_i.shape
                     batch_indices = torch.arange(batch_size, device=aug_idx_selected_indices_i.device).unsqueeze(1).expand(-1, topk)
                     scores[k] = full_scores[batch_indices, aug_idx_selected_indices_i]
-                aug_loss_lst.append(hydra_kd_imi_agent_loss_single_stage(aug_idx_pred_i, self._config, scores))
+                _kwargs_idx = {}
+                if self._config.lab.use_imi_learning_in_refinement:
+                    _kwargs_idx['targets'] = { 'trajectory': targets['rotated_trajectories'][idx] }
+                    aug_idx_pred_i['trajectory_vocab'] = trajectory_vocab
+                aug_loss_lst.append(hydra_kd_imi_agent_loss_single_stage(aug_idx_pred_i, self._config, scores, **_kwargs_idx))
             aug_loss_single_mode = sum([loss_tup[0] for loss_tup in aug_loss_lst])
             aug_loss_single_mode_dict = {}
             for i, loss_tup in enumerate(aug_loss_lst):
