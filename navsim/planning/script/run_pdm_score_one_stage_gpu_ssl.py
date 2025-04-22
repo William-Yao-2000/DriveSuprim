@@ -326,6 +326,12 @@ def main(cfg: DictConfig) -> None:
     score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score_wo_inference, data_points)
 
     pdm_score_df = pd.concat(score_rows)
+    old_pdms = (pdm_score_df['no_at_fault_collisions'] *
+            pdm_score_df['drivable_area_compliance'] *
+            ((5 * pdm_score_df['ego_progress'] +
+                5 * pdm_score_df['time_to_collision_within_bound'] +
+                2 * pdm_score_df['history_comfort']) / 12))
+    pdm_score_df['old_pdms'] = old_pdms
 
     start_adjacent_mapping = infer_start_adjacent_mapping(pdm_score_df)
     pdm_score_df = create_scene_aggregators(
@@ -344,7 +350,7 @@ def main(cfg: DictConfig) -> None:
         c
         for c in pdm_score_df.columns
         if (
-            (any(score.name in c for score in fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score")
+            (any(score.name in c for score in fields(PDMResults)) or c == "two_frame_extended_comfort" or c == "score" or c == 'old_pdms')
             and c != "pdm_score"
         )
     ]
@@ -368,6 +374,7 @@ def main(cfg: DictConfig) -> None:
             Number of successful scenarios: {num_sucessful_scenarios}.
             Number of failed scenarios: {num_failed_scenarios}.
             Final average score of valid results: {pdm_score_df['score'].mean()}.
+            Final old PDMS: {pdm_score_df['old_pdms'].mean()}.
             Results are stored in: {save_path / f"{timestamp}.csv"}.
         """
     )
