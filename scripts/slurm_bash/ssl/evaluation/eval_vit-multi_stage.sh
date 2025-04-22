@@ -35,3 +35,12 @@ submit_job \
     --partition $partition \
     --account av_research \
     -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash scripts/ssl/evaluation/eval_vit-multi_stage.sh $epoch $dir $num_refinement_stage $stage_layers $topks"
+
+
+: '
+usage:
+bash scripts/slurm_bash/ssl/evaluation/eval_vit-multi_stage.sh \
+    3 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256 \
+    interactive \
+    -num_refinement_stage=1 -stage_layers=3 -topks=256
+'
