@@ -44,7 +44,6 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
     train_test_split=navtest \
-    traffic_agents_policy=non_reactive
 "
 
 echo "--- COMMAND ---"
