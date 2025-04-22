@@ -15,17 +15,17 @@ padded_epoch=$(printf "%02d" $epoch)
 # Calculate step from epoch (1330 steps per epoch)
 step=$((($epoch + 1) * 1330))
 
-metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori-two_stage"
+metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep-two_stage"
+    experiment_name="${dir}/test-${padded_epoch}ep-one_stage"
 else
-    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}"
+    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-one_stage"
 fi
 
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
+python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
     +debug=false \
     +use_pdm_closed=false \
     agent=hydra_img_vit_ssl \
@@ -43,7 +43,8 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
-    train_test_split=navtest_two_stage
+    train_test_split=navtest \
+    traffic_agents_policy=non_reactive
 "
 
 echo "--- COMMAND ---"

@@ -31,14 +31,14 @@ from navsim.planning.simulation.planner.pdm_planner.scoring.pdm_scorer import PD
 from navsim.planning.simulation.planner.pdm_planner.scoring.scene_aggregator import SceneAggregator
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
 from navsim.planning.simulation.planner.pdm_planner.utils.pdm_enums import WeightedMetricIndex
-from navsim.planning.training.agent_lightning_module import AgentLightningModule
-from navsim.planning.training.dataset import Dataset
+from navsim.planning.training.agent_lightning_module_ssl import AgentLightningModuleSSL
+from navsim.planning.training.dataset_ssl import DatasetSSL as Dataset
 from navsim.traffic_agents_policies.abstract_traffic_agents_policy import AbstractTrafficAgentsPolicy
 
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = "config/pdm_scoring"
-CONFIG_NAME = "default_run_pdm_score_gpu"
+CONFIG_NAME = "default_run_pdm_score_gpu_ssl"
 
 
 def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[pd.DataFrame]:
@@ -238,6 +238,10 @@ def main(cfg: DictConfig) -> None:
 
     build_logger(cfg)
 
+    if cfg.debug:
+        import pdb; pdb.set_trace()
+        import os; os.environ['ROBUST_HYDRA_DEBUG'] = 'true'
+
     # gpu inference
     agent: AbstractAgent = instantiate(cfg.agent)
     agent.initialize()
@@ -253,6 +257,7 @@ def main(cfg: DictConfig) -> None:
         feature_builders=agent.get_feature_builders(),
         target_builders=agent.get_target_builders(),
         cache_path=None,
+        cfg=cfg.agent.config,
         force_cache_computation=False,
         append_token_to_batch=True
     )
@@ -279,7 +284,8 @@ def main(cfg: DictConfig) -> None:
     
     trainer = pl.Trainer(**cfg.trainer.params, callbacks=agent.get_training_callbacks())
     predictions = trainer.predict(
-        AgentLightningModule(
+        AgentLightningModuleSSL(
+            cfg=cfg.agent.config,
             agent=agent,
         ),
         dataloader,

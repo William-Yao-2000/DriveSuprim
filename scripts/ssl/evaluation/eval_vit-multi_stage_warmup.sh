@@ -19,9 +19,9 @@ metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/warmup_two_stage"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep-warmup"
+    experiment_name="${dir}/test-${padded_epoch}ep-warmup_two_stage"
 else
-    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-warmup"
+    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-warmup_two_stage"
 fi
 
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
