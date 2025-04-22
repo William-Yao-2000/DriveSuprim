@@ -55,6 +55,35 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     train_test_split=navtest
 ```
 
+temp debug
+```bash
+TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_debug.py \
+    +debug=true \
+    +use_pdm_closed=false \
+    agent=hydra_img_vit_ssl \
+    worker.threads_per_node=0 \
+    worker.debug_mode=true \
+    dataloader.params.batch_size=2 \
+    dataloader.params.num_workers=0 \
+    dataloader.params.pin_memory=false \
+    dataloader.params.prefetch_factor=null \
+    agent.config.training=false \
+    agent.config.only_ori_input=true \
+    agent.config.inference.model=teacher \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=2 \
+    agent.config.refinement.stage_layers=3+3 \
+    agent.config.refinement.topks=256+64 \
+    agent.config.lab.use_first_stage_traj_in_infer=false \
+    agent.checkpoint_path='/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp_v2/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage-bug_2_sigmoids/stage_layers_3+3-topks_256+64/epoch\=04-step\=6650.ckpt' \
+    experiment_name=debug \
+    +cache_path=null \
+    metric_cache_path=/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp_v2/metric_cache/test/ori-two_stage \
+    train_test_split=navtest_two_stage
+```
+
+
 debug (v1)
 ```bash
 TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
