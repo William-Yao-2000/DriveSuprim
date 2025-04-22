@@ -42,6 +42,6 @@ submit_job \
 usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs/loss_weight-imi_learning.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/loss_weight-imi_learning.sh \
-    interactive_singlenode \
+    interactive \
     -change_loss_weight=false -use_imi_learning_in_refinement=true
 '

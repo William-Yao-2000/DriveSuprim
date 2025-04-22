@@ -15,7 +15,7 @@ padded_epoch=$(printf "%02d" $epoch)
 # Calculate step from epoch (1330 steps per epoch)
 step=$((($epoch + 1) * 1330))
 
-metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
+metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori-two_stage"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
