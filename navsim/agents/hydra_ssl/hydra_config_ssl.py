@@ -279,7 +279,8 @@ class HydraConfigSSL(TransfuserConfig):
 
     only_imi_learning: bool = False
 
-    soft_label_diff_thresh: float = 0.3
+    soft_label_imi_diff_thresh: float = 1.0
+    soft_label_score_diff_thresh: float = 0.15
 
     use_rotation_loss: bool = False
     use_mask_loss: bool = False

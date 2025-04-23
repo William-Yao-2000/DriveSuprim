@@ -219,10 +219,10 @@ augmentation
 python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=navtrain \
     +debug=false \
     worker.threads_per_node=192 \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/random_aug/rot_30-trans_0-va_0-p_0.5-seed_2025 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/random_aug/rot_30-trans_0-va_0-p_0.5-seed_2026 \
     aug_train.rotation=30 \
     aug_train.va=0 \
-    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-seed_2025.json \
+    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-seed_2026.json \
     --config-name metric_caching_aug_train
 ```
 
@@ -395,11 +395,11 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.ego_perturb.rotation.enable=true \
     agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
     agent.config.student_rotation_ensemble=3 \
+    agent.config.soft_label_score_diff_thresh=0.5 \
     agent.config.refinement.use_multi_stage=true \
     agent.config.refinement.num_refinement_stage=1 \
     agent.config.refinement.stage_layers=3 \
     agent.config.refinement.topks=64 \
-    agent.config.lab.change_loss_weight=true \
     agent.config.lab.use_imi_learning_in_refinement=true \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \

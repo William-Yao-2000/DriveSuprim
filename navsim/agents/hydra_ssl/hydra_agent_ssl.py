@@ -220,26 +220,25 @@ class HydraAgentSSL(AbstractAgent):
             targets,
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         # get the pdm score by tokens
 
         sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]
         traj_diff = teacher_pred['trajectory'][:, sampled_timepoints] - targets['ori_trajectory']
-        clamped_traj_diff = torch.clamp(traj_diff, min=-self._config.soft_label_diff_thresh, max=self._config.soft_label_diff_thresh)
+        clamped_traj_diff = torch.clamp(traj_diff, min=-self._config.soft_label_imi_diff_thresh, max=self._config.soft_label_imi_diff_thresh)
         # Apply clamped adjustment to original trajectory
         revised_targets = { 'trajectory': targets['ori_trajectory'] + clamped_traj_diff }
 
         scores = {}
         revised_scores = {}
         for k in self.metrics:
-            # if k == 'dd':
-            #     continue
             tmp = [self.ori_vocab_pdm_score_full[token][k][None] for token in tokens]
             scores[k] = torch.from_numpy(np.concatenate(tmp, axis=0)).to(teacher_pred['trajectory'].device).float()
             # Calculate difference and clamp to max 0.2
             diff = teacher_pred[k].sigmoid() - scores[k]
-            clamped_diff = torch.clamp(diff, min=-0.15, max=0.15)
+            _soft_label_score_diff_thresh = self._config.soft_label_score_diff_thresh
+            clamped_diff = torch.clamp(diff, min=-_soft_label_score_diff_thresh, max=_soft_label_score_diff_thresh)
             # Apply clamped adjustment to original scores
             revised_scores[k] = scores[k] + clamped_diff
         
