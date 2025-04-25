@@ -19,7 +19,7 @@ numpy==1.23.4
 opencv-python==4.9.0.80  # Used widely
 pandas    # Used widely
 Pillow    # Used widely to render images
-psutil==5.9.0  # Used widely to get the number of CPUs
+psutil  # Used widely to get the number of CPUs
 pyarrow # For parquet
 pyinstrument    # Used widely as profiler
 pyogrio # A performant backend for geopandas
