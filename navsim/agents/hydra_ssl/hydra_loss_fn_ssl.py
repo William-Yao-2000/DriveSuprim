@@ -34,8 +34,8 @@ def hydra_kd_imi_agent_loss_robust(
     )
     history_comfort = predictions['history_comfort']
     imi = predictions['imi']
-    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        import pdb; pdb.set_trace()
+    # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+    #     import pdb; pdb.set_trace()
     _dtype = imi.dtype
 
     # 2 cls
@@ -202,6 +202,10 @@ def hydra_kd_imi_agent_loss_single_stage(
         )
         if config.lab.use_imi_learning_in_refinement:
             loss += imi_loss_final
+        
+        if config.lab.adjust_refinement_loss_weight:
+            n_cur_traj = drivable_area_compliance.shape[1]
+            loss *= n_cur_traj / config.vocab_size
         
         total_loss += loss
         losses[f'layer_{layer+1}'] = loss

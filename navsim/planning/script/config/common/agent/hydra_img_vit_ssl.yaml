@@ -136,6 +136,7 @@ config:
     use_first_stage_traj_in_infer: false
     change_loss_weight: false
     use_imi_learning_in_refinement: true
+    adjust_refinement_loss_weight: false
 
 
 checkpoint_path: null

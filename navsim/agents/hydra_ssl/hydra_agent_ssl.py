@@ -220,8 +220,8 @@ class HydraAgentSSL(AbstractAgent):
             targets,
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         # get the pdm score by tokens
 
         sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]

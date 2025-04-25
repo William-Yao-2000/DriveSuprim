@@ -108,6 +108,7 @@ class LabConfig:
     use_first_stage_traj_in_infer: bool = False
     change_loss_weight: bool = False
     use_imi_learning_in_refinement: bool = True
+    adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
 
 
 @dataclass
