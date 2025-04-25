@@ -137,6 +137,7 @@ config:
     change_loss_weight: false
     use_imi_learning_in_refinement: true
     adjust_refinement_loss_weight: false
+    ban_soft_label_loss: false
 
 
 checkpoint_path: null

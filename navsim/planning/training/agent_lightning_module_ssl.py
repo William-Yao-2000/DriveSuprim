@@ -76,35 +76,38 @@ class AgentLightningModuleSSL(pl.LightningModule):
             self.log(f"{logging_prefix}/loss-aug", aug_loss[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + aug_loss[0]
         
-            # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
+        if not self._cfg.lab.ban_soft_label_loss:
             loss_soft_teacher = self.agent.compute_loss_soft_teacher(teacher_pred, student_preds[0], targets, tokens)
             for k, v in loss_soft_teacher[1].items():
                 self.log(f"{logging_prefix}/{k}-soft", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             self.log(f"{logging_prefix}/loss-soft", loss_soft_teacher[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + loss_soft_teacher[0]
 
-            if self._cfg.use_rotation_loss:
-                loss_rotation = self.agent.compute_rotation_loss(teacher_pred, student_preds, tokens)
-                self.log(f"{logging_prefix}/loss-rotation", loss_rotation, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-                loss += loss_rotation
-            else:
-                loss += student_preds[0]['cls_token_after_head'].sum() * 0.0
+        if self._cfg.use_rotation_loss:
+            loss_rotation = self.agent.compute_rotation_loss(teacher_pred, student_preds, tokens)
+            self.log(f"{logging_prefix}/loss-rotation", loss_rotation, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            loss += loss_rotation
+        else:
+            loss += student_preds[0]['cls_token_after_head'].sum() * 0.0
 
-            if self._cfg.use_mask_loss:
-                loss_ibot = loss_dict['loss_ibot']
-                self.log(f"{logging_prefix}/loss-ibot", loss_ibot, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-                loss += loss_ibot
+        if self._cfg.use_mask_loss:
+            loss_ibot = loss_dict['loss_ibot']
+            self.log(f"{logging_prefix}/loss-ibot", loss_ibot, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            loss += loss_ibot
 
-            if self._cfg.refinement.use_multi_stage:
-                loss_refinement = self.agent.compute_loss_multi_stage(features, targets, student_preds, tokens)
-                
-                loss_refinement_ori = loss_refinement['ori']
-                for k, v in loss_refinement_ori[1].items():
-                    self.log(f"{logging_prefix}/{k}-ori", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-                self.log(f"{logging_prefix}/loss-refinement_ori", loss_refinement_ori[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-                loss = loss + loss_refinement_ori[0]
+        if self._cfg.refinement.use_multi_stage:
+            loss_refinement = self.agent.compute_loss_multi_stage(features, targets, student_preds, tokens)
+            
+            loss_refinement_ori = loss_refinement['ori']
+            for k, v in loss_refinement_ori[1].items():
+                self.log(f"{logging_prefix}/{k}-ori", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log(f"{logging_prefix}/loss-refinement_ori", loss_refinement_ori[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            loss = loss + loss_refinement_ori[0]
+
+            if not self.only_ori_input:
                 loss_refinement_aug = loss_refinement['aug']
                 for k, v in loss_refinement_aug[1].items():
                     self.log(f"{logging_prefix}/{k}-aug", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
