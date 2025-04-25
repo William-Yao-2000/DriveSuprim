@@ -276,8 +276,8 @@ class HydraTrajHead(nn.Module):
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
@@ -446,8 +446,8 @@ class TrajOffsetHead(nn.Module):
         # status_encoding: bs, topk, c
         # coarse_scores: dict
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         B = bev_feat_fg.shape[0]
         
