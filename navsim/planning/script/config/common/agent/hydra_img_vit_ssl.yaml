@@ -135,7 +135,7 @@ config:
     test_full_vocab_pdm_score_path: "aaa"
     use_first_stage_traj_in_infer: false
     change_loss_weight: false
-    use_imi_learning_in_refinement: false
+    use_imi_learning_in_refinement: true
 
 
 checkpoint_path: null
