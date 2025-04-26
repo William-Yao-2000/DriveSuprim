@@ -26,6 +26,7 @@ submit_job \
 : '
 usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs/adjust_refinement_loss_weight.sh \
-    scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/adjust_refinement_loss_weight.sh \
+    scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/adjust_refinement_loss_weight.sh
+    interactive \
     1 3 256 \
 '
