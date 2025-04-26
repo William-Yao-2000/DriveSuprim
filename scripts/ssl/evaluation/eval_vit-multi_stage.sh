@@ -51,3 +51,11 @@ echo $command_string
 echo -e "\n\n"
 
 eval $command_string
+
+
+: '
+usage:
+bash scripts/ssl/evaluation/eval_vit-multi_stage.sh \
+    3 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3+3-topks_256+64 \
+    2 3+3 256+64
+'
