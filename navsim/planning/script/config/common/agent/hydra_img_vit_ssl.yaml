@@ -94,6 +94,7 @@ config:
 
   only_imi_learning: false
 
+  soft_label_traj: 'first'
   soft_label_imi_diff_thresh: 1.0
   soft_label_score_diff_thresh: 0.15
 

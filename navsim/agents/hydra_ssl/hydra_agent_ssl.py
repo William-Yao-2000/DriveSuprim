@@ -221,12 +221,16 @@ class HydraAgentSSL(AbstractAgent):
             targets,
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         # get the pdm score by tokens
 
         sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]
-        traj_diff = teacher_pred['trajectory'][:, sampled_timepoints] - targets['ori_trajectory']
+        if self._config.soft_label_traj == 'first':
+            traj_diff = teacher_pred['trajectory'][:, sampled_timepoints] - targets['ori_trajectory']
+        elif self._config.soft_label_traj == 'final':
+            traj_diff = teacher_pred['final_traj'][:, sampled_timepoints] - targets['ori_trajectory']
+
         clamped_traj_diff = torch.clamp(traj_diff, min=-self._config.soft_label_imi_diff_thresh, max=self._config.soft_label_imi_diff_thresh)
         # Apply clamped adjustment to original trajectory
         revised_targets = { 'trajectory': targets['ori_trajectory'] + clamped_traj_diff }

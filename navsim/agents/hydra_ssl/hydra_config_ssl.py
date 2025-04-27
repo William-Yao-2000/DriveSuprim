@@ -282,6 +282,7 @@ class HydraConfigSSL(TransfuserConfig):
 
     only_imi_learning: bool = False
 
+    soft_label_traj: str = 'first'  # first or final
     soft_label_imi_diff_thresh: float = 1.0
     soft_label_score_diff_thresh: float = 0.15
 
