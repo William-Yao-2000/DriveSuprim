@@ -15,9 +15,9 @@ import torch.nn.functional as F
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.dp.dp_agent import DPAgent
 from navsim.agents.hydra_plus.hydra_features import state2traj
-from navsim.agents.hydra_plus.hydra_plus_agent import HydraPlusAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
+from navsim.agents.hydra_ssl.hydra_agent_ssl import HydraAgentSSL
 from navsim.common.dataclasses import Trajectory
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
 
@@ -35,7 +35,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
         super().__init__()
 
         self._cfg = cfg
-        self.agent = agent
+        self.agent: HydraAgentSSL = agent
         self.simulator = PDMSimulator(
             TrajectorySampling(num_poses=40, interval_length=0.1)
         )
@@ -60,6 +60,9 @@ class AgentLightningModuleSSL(pl.LightningModule):
             import pdb; pdb.set_trace()
 
         teacher_pred, student_preds, loss_dict = self.agent.forward(batch)
+        if self._cfg.lab.optimize_prev_frame_traj_for_ec:
+            teacher_pred_dict = teacher_pred
+            teacher_pred = teacher_pred_dict['cur']
 
         loss_student = self.agent.compute_loss(features, targets, student_preds, tokens)
 
@@ -113,6 +116,14 @@ class AgentLightningModuleSSL(pl.LightningModule):
                     self.log(f"{logging_prefix}/{k}-aug", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
                 self.log(f"{logging_prefix}/loss-refinement_aug", loss_refinement_aug[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
                 loss = loss + loss_refinement_aug[0]
+            
+        if self._cfg.lab.optimize_prev_frame_traj_for_ec:
+            teacher_pred_prev = teacher_pred_dict['prev']
+            loss_prev = self.agent.compute_loss_prev_traj(teacher_pred_prev, student_preds[0])
+            for k, v in loss_prev[1].items():
+                self.log(f"{logging_prefix}/{k}-prev", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log(f"{logging_prefix}/loss-prev", loss_prev[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            loss = loss + loss_prev[0]
 
         
         self.log(f"{logging_prefix}/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)

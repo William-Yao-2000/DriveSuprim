@@ -176,6 +176,19 @@ class SSLMetaArch(nn.Module):
         # reshard_fsdp_model(self.teacher)
         if not self.cfg.training:
             return teacher_pred, [], {}
+        
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+        
+        if self.cfg.lab.optimize_prev_frame_traj_for_ec:
+            teacher_pred = {'cur': teacher_pred}
+            teacher_prev_feat = {
+                'camera_feature': [teacher_ori_features['camera_feature'][-2],],
+                'status_feature': [teacher_ori_features['status_feature'][1],],
+            }
+            prev_pred = self.teacher.model(teacher_prev_feat, **kwargs)
+            teacher_pred['prev'] = prev_pred
+
 
         loss_dict = {}
 

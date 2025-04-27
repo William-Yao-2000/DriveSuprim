@@ -5,6 +5,7 @@ import json
 
 import numpy as np
 from pytorch_lightning.callbacks import ModelCheckpoint
+import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -125,8 +126,8 @@ class HydraAgentSSL(AbstractAgent):
         return [HydraSSLFeatureBuilder(config=self._config)]
 
     def forward(self, batch) -> Dict[str, torch.Tensor]:
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         features, targets, tokens = batch
         kwargs = {'tokens': tokens}
@@ -283,8 +284,8 @@ class HydraAgentSSL(AbstractAgent):
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         trajectory_vocab = predictions[0]['trajectory_vocab']
 
@@ -360,6 +361,50 @@ class HydraAgentSSL(AbstractAgent):
         result_dict['aug'] = (avg_aug_loss, avg_aug_loss_dict)
 
         return result_dict
+    
+    def compute_loss_prev_traj(
+            self,
+            teacher_pred_prev: Dict[str, torch.Tensor],
+            student_pred: Dict[str, torch.Tensor],
+            tokens=None
+    ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+        # get the pdm score by tokens
+
+        sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]
+        teacher_prev_traj_intersect = teacher_pred_prev['final_traj'][:, sampled_timepoints][:, 1:]
+
+        loss_dict = {}
+        
+        loss = 0.0
+        # stage 1
+        imi = student_pred['imi']
+        vocab_intersect = student_pred["trajectory_vocab"][:, sampled_timepoints][:, :-1]  # [vocab_size, 7, 3]
+        target_traj = teacher_prev_traj_intersect
+        B = target_traj.shape[0]
+        l2_distance = -((vocab_intersect[None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / self._config.sigma
+        imi_loss = F.cross_entropy(imi, l2_distance.sum((-2, -1)).softmax(1))
+        imi_loss_final = self._config.trajectory_imi_weight * imi_loss
+        loss_dict['imi_loss-stage_1'] = imi_loss_final
+        loss += imi_loss_final
+
+        # refinement stages
+        n_refine_stages = len(student_pred['refinement'])
+        for i in range(n_refine_stages):
+            n_layer_i = len(student_pred['refinement'][i]['layer_results'])
+            vocab_intersect_i = student_pred['refinement'][i]['trajs'][:, :, sampled_timepoints][:, :, :-1]  # [bs, vocab_size, 7, 3]
+            l2_distance_i = -((vocab_intersect_i - target_traj[:, None]) ** 2) / self._config.sigma
+            imi_loss_i_final = 0.0
+            for k in range(n_layer_i):
+                imi_i_k = student_pred['refinement'][i]['layer_results'][k]['imi']  # [bs, vocab_size_stage_i]
+                imi_loss_i_k = F.cross_entropy(imi_i_k, l2_distance_i.sum((-2, -1)).softmax(1))
+                imi_loss_i_k_final = self._config.trajectory_imi_weight * imi_loss_i_k
+                imi_loss_i_final += imi_loss_i_k_final
+            loss_dict[f'imi_loss-stage_{i+2}'] = imi_loss_i_final
+            loss += imi_loss_i_final
+
+        return loss, loss_dict
 
     def get_optimizers(self) -> Union[Optimizer, Dict[str, Union[Optimizer, LRScheduler]]]:
         backbone_params_name = '_backbone.image_encoder'

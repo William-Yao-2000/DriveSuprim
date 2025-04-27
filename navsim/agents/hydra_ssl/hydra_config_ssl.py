@@ -110,6 +110,7 @@ class LabConfig:
     use_imi_learning_in_refinement: bool = True
     adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
     ban_soft_label_loss: bool = False
+    optimize_prev_frame_traj_for_ec: bool = False
 
 
 @dataclass

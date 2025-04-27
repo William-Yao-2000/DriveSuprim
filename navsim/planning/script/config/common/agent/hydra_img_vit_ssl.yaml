@@ -138,6 +138,7 @@ config:
     use_imi_learning_in_refinement: true
     adjust_refinement_loss_weight: false
     ban_soft_label_loss: false
+    optimize_prev_frame_traj_for_ec: false
 
 
 checkpoint_path: null
