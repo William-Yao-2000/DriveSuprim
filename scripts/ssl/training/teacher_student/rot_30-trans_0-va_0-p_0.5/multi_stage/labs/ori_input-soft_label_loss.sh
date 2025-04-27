@@ -1,7 +1,7 @@
 agent="hydra_img_vit_ssl"
 bs=8
 lr=0.000075
-epoch=20
+epoch=8
 config="competition_training"
 rot=30
 trans=0
