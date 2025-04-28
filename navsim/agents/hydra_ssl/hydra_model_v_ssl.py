@@ -228,6 +228,15 @@ class HydraTrajHead(nn.Module):
             )
         })
 
+        if self._config.lab.optimize_prev_frame_traj_for_ec:
+            self.heads['imi_prev'] = nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            )
+
         self.inference_imi_weight = config.inference_imi_weight
         self.inference_da_weight = config.inference_da_weight
         self.normalize_vocab_pos = config.normalize_vocab_pos
@@ -276,8 +285,8 @@ class HydraTrajHead(nn.Module):
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
@@ -298,6 +307,9 @@ class HydraTrajHead(nn.Module):
                    1.0 * result['history_comfort'].sigmoid()
                    ).log()
         )
+        if self._config.lab.optimize_prev_frame_traj_for_ec:
+            scores += 0.008 * result['imi_prev'].softmax(-1).log()
+        
         selected_indices = scores.argmax(1)
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
@@ -425,6 +437,14 @@ class TrajOffsetHead(nn.Module):
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
             )
+        if self._config.lab.optimize_prev_frame_traj_for_ec:
+            heads['imi_prev'] = nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            )
 
         if self.use_separate_stage_heads:
             self.multi_stage_heads = nn.ModuleList([copy.deepcopy(heads) for _ in range(num_stage)])
@@ -446,8 +466,8 @@ class TrajOffsetHead(nn.Module):
         # status_encoding: bs, topk, c
         # coarse_scores: dict
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         B = bev_feat_fg.shape[0]
         
@@ -495,6 +515,8 @@ class TrajOffsetHead(nn.Module):
             )
             if self._config.lab.use_imi_learning_in_refinement:
                 scores += 0.02 * last_layer_result['imi'].softmax(-1).log()
+            if self._config.lab.optimize_prev_frame_traj_for_ec:
+                scores += 0.008 * last_layer_result['imi_prev'].softmax(-1).log()
 
             if i != self.num_stage-1:
                 _next_layer_dict = {}

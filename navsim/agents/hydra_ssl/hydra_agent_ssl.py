@@ -383,7 +383,7 @@ class HydraAgentSSL(AbstractAgent):
         
         loss = 0.0
         # stage 1
-        imi = student_pred['imi']
+        imi = student_pred['imi_prev']
         vocab_intersect = student_pred["trajectory_vocab"][:, sampled_timepoints][:, :-1]  # [vocab_size, 7, 3]
         target_traj = teacher_prev_traj_intersect
         B = target_traj.shape[0]
@@ -401,7 +401,7 @@ class HydraAgentSSL(AbstractAgent):
             l2_distance_i = -((vocab_intersect_i - target_traj[:, None]) ** 2) / self._config.sigma
             imi_loss_i_final = 0.0
             for k in range(n_layer_i):
-                imi_i_k = student_pred['refinement'][i]['layer_results'][k]['imi']  # [bs, vocab_size_stage_i]
+                imi_i_k = student_pred['refinement'][i]['layer_results'][k]['imi_prev']  # [bs, vocab_size_stage_i]
                 imi_loss_i_k = F.cross_entropy(imi_i_k, l2_distance_i.sum((-2, -1)).softmax(1))
                 imi_loss_i_k_final = self._config.trajectory_imi_weight * imi_loss_i_k
                 imi_loss_i_final += imi_loss_i_k_final
