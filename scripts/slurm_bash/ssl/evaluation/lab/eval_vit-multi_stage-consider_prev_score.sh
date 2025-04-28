@@ -23,6 +23,6 @@ submit_job \
 : '
 usage:
 bash scripts/slurm_bash/ssl/evaluation/lab/eval_vit-multi_stage-consider_prev_score.sh \
-    2 rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-optimize_prev_frame_traj_for_ec_v2 \
+    2 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-optimize_prev_frame_traj_for_ec_v2 \
     interactive_singlenode
 '
