@@ -177,8 +177,8 @@ class SSLMetaArch(nn.Module):
         if not self.cfg.training:
             return teacher_pred, [], {}
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         
         if self.cfg.lab.optimize_prev_frame_traj_for_ec:
             teacher_pred = {'cur': teacher_pred}

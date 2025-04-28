@@ -56,8 +56,8 @@ class AgentLightningModuleSSL(pl.LightningModule):
         :return: scalar loss
         """
         features, targets, tokens = batch
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         teacher_pred, student_preds, loss_dict = self.agent.forward(batch)
         if self._cfg.lab.optimize_prev_frame_traj_for_ec:
@@ -79,8 +79,8 @@ class AgentLightningModuleSSL(pl.LightningModule):
             self.log(f"{logging_prefix}/loss-aug", aug_loss[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + aug_loss[0]
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         if not self._cfg.lab.ban_soft_label_loss:
             loss_soft_teacher = self.agent.compute_loss_soft_teacher(teacher_pred, student_preds[0], targets, tokens)
