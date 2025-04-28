@@ -354,8 +354,8 @@ class TrajOffsetHead(nn.Module):
                  ):
         super().__init__()
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         stage_layers = str(stage_layers)
         topks = str(topks)
         
@@ -554,14 +554,18 @@ class TrajOffsetHead(nn.Module):
             last_layer_result = layer_results[-1]
             refinement_metrics = self._config.lab.refinement_metrics
             if refinement_metrics == 'all':
+                if self._config.lab.adjust_refinement_score_weight:
+                    revised_times = 3.0
+                else:
+                    revised_times = 1.0
                 scores = (
                     0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
                     0.5 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
-                    0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                    revised_times * 0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
                     0.3 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
                     6.0 * (5.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
-                        5.0 * last_layer_result['ego_progress'].sigmoid() +
-                        2.0 * last_layer_result['lane_keeping'].sigmoid() +
+                        revised_times * 5.0 * last_layer_result['ego_progress'].sigmoid() +
+                        revised_times * 2.0 * last_layer_result['lane_keeping'].sigmoid() +
                         1.0 * last_layer_result['history_comfort'].sigmoid()
                         ).log()
                 )

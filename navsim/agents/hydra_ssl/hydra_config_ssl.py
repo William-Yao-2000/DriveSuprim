@@ -109,6 +109,7 @@ class LabConfig:
     change_loss_weight: bool = False
     use_imi_learning_in_refinement: bool = True
     adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
+    adjust_refinement_score_weight: bool = False  # change dac, ep, lk score weight to 2 times
     ban_soft_label_loss: bool = False
     optimize_prev_frame_traj_for_ec: bool = False
     refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
