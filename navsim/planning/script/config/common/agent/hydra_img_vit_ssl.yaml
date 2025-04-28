@@ -140,6 +140,7 @@ config:
     adjust_refinement_loss_weight: false
     ban_soft_label_loss: false
     optimize_prev_frame_traj_for_ec: false
+    refinement_metrics: 'all'
 
 
 checkpoint_path: null

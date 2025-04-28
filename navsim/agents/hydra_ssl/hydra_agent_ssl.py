@@ -126,8 +126,8 @@ class HydraAgentSSL(AbstractAgent):
         return [HydraSSLFeatureBuilder(config=self._config)]
 
     def forward(self, batch) -> Dict[str, torch.Tensor]:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         
         features, targets, tokens = batch
         kwargs = {'tokens': tokens}
@@ -288,8 +288,12 @@ class HydraAgentSSL(AbstractAgent):
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+
+        _refinement_metrics = self.metrics
+        if self._config.lab.refinement_metrics == 'dac_ep_lk_pdms':
+            _refinement_metrics = _refinement_metrics + ['pdm_score']
 
         trajectory_vocab = predictions[0]['trajectory_vocab']
 
@@ -302,7 +306,7 @@ class HydraAgentSSL(AbstractAgent):
             pred_i = ori_predictions[i]
             selected_indices_i = pred_i['indices_absolute']
             scores = {}
-            for k in self.metrics:
+            for k in _refinement_metrics:
                 tmp = [self.ori_vocab_pdm_score_full[token][k][None] for token in tokens]
                 full_scores = torch.from_numpy(np.concatenate(tmp, axis=0)).to(selected_indices_i.device)  # [bs, vocab_size]
                 # Extract scores based on selected indices [bs, topk_stage_i]
@@ -338,7 +342,7 @@ class HydraAgentSSL(AbstractAgent):
                 aug_idx_pred_i = aug_idx_predictions[i]
                 aug_idx_selected_indices_i = aug_idx_pred_i['indices_absolute']
                 scores = {}
-                for k in self.metrics:
+                for k in _refinement_metrics:
                     tmp = [_aug_vocab_pdm_score[token][idx][k][None] for token in tokens]
                     full_scores = torch.from_numpy(np.concatenate(tmp, axis=0)).to(aug_idx_selected_indices_i.device)
                     batch_size, topk = aug_idx_selected_indices_i.shape

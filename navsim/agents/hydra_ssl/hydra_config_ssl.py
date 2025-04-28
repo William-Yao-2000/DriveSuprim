@@ -111,6 +111,7 @@ class LabConfig:
     adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
     ban_soft_label_loss: bool = False
     optimize_prev_frame_traj_for_ec: bool = False
+    refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
 
 
 @dataclass

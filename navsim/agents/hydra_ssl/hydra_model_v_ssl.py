@@ -285,8 +285,8 @@ class HydraTrajHead(nn.Module):
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
@@ -354,8 +354,8 @@ class TrajOffsetHead(nn.Module):
                  ):
         super().__init__()
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         stage_layers = str(stage_layers)
         topks = str(topks)
         
@@ -386,49 +386,99 @@ class TrajOffsetHead(nn.Module):
         ) for layer in self.stage_layers]
         self.transformer_blocks = nn.ModuleList(transformer_blocks)
 
-        heads = nn.ModuleDict({
-            'no_at_fault_collisions': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-            'drivable_area_compliance':
-                nn.Sequential(
+
+        assert self._config.lab.refinement_metrics in ('all', 'dac_ep_lk', 'dac_ep_lk_pdms')
+        refinement_metrics = self._config.lab.refinement_metrics
+        if refinement_metrics == 'all':
+            heads = nn.ModuleDict({
+                'no_at_fault_collisions': nn.Sequential(
                     nn.Linear(d_model, d_ffn),
                     nn.ReLU(),
                     nn.Linear(d_ffn, 1),
                 ),
-            'time_to_collision_within_bound': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-            'ego_progress': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-            'driving_direction_compliance': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-            'lane_keeping': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-            'traffic_light_compliance': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-            'history_comfort': nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            ),
-        })
+                'drivable_area_compliance':
+                    nn.Sequential(
+                        nn.Linear(d_model, d_ffn),
+                        nn.ReLU(),
+                        nn.Linear(d_ffn, 1),
+                    ),
+                'time_to_collision_within_bound': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'ego_progress': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'driving_direction_compliance': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'lane_keeping': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'traffic_light_compliance': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'history_comfort': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+            })
+        elif refinement_metrics == 'dac_ep_lk':
+            heads = nn.ModuleDict({
+                'drivable_area_compliance':
+                    nn.Sequential(
+                        nn.Linear(d_model, d_ffn),
+                        nn.ReLU(),
+                        nn.Linear(d_ffn, 1),
+                ),
+                'ego_progress': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'lane_keeping': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+            })
+        elif refinement_metrics == 'dac_ep_lk_pdms':
+            heads = nn.ModuleDict({
+                'drivable_area_compliance':
+                    nn.Sequential(
+                        nn.Linear(d_model, d_ffn),
+                        nn.ReLU(),
+                        nn.Linear(d_ffn, 1),
+                ),
+                'ego_progress': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'lane_keeping': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+                'pdm_score': nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+            })
+        
         if self._config.lab.use_imi_learning_in_refinement:
             heads['imi'] = nn.Sequential(
                 nn.Linear(d_model, d_ffn),
@@ -479,7 +529,7 @@ class TrajOffsetHead(nn.Module):
             # Compute scores for each layer
             layer_results = []
             # Initialize reference scores from coarse_score
-            reference = refinement_dict[-1]['coarse_score']
+            # reference = refinement_dict[-1]['coarse_score']
             for j, dist_status in enumerate(tr_out_lst):
                 layer_result = {}
                 for k, head in self.multi_stage_heads[i].items():
@@ -502,17 +552,36 @@ class TrajOffsetHead(nn.Module):
             refinement_dict[-1]['layer_results'] = layer_results
             
             last_layer_result = layer_results[-1]
-            scores = (
-                0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
-                0.5 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
-                0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
-                0.3 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
-                6.0 * (5.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
-                       5.0 * last_layer_result['ego_progress'].sigmoid() +
-                       2.0 * last_layer_result['lane_keeping'].sigmoid() +
-                       1.0 * last_layer_result['history_comfort'].sigmoid()
-                       ).log()
-            )
+            refinement_metrics = self._config.lab.refinement_metrics
+            if refinement_metrics == 'all':
+                scores = (
+                    0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
+                    0.5 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
+                    0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                    0.3 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
+                    6.0 * (5.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
+                        5.0 * last_layer_result['ego_progress'].sigmoid() +
+                        2.0 * last_layer_result['lane_keeping'].sigmoid() +
+                        1.0 * last_layer_result['history_comfort'].sigmoid()
+                        ).log()
+                )
+            elif refinement_metrics == 'dac_ep_lk':
+                scores = (
+                    0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                    6.0 * (
+                        5.0 * last_layer_result['ego_progress'].sigmoid() +
+                        2.0 * last_layer_result['lane_keeping'].sigmoid()
+                        ).log()
+                )
+            elif refinement_metrics == 'dac_ep_lk_pdms':
+                scores = (
+                    0.4 * last_layer_result['pdm_score'].sigmoid().log() +
+                    0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                    6.0 * (
+                        5.0 * last_layer_result['ego_progress'].sigmoid() +
+                        2.0 * last_layer_result['lane_keeping'].sigmoid()
+                        ).log()
+                )
             if self._config.lab.use_imi_learning_in_refinement:
                 scores += 0.02 * last_layer_result['imi'].softmax(-1).log()
             if self._config.lab.optimize_prev_frame_traj_for_ec:
@@ -527,9 +596,9 @@ class TrajOffsetHead(nn.Module):
                 _next_layer_dict["trajs"] = refinement_dict[-1]['trajs'][batch_indices, select_indices]
                 _next_layer_dict["trajs_status"] = tr_out_lst[-1][batch_indices, select_indices]
                 _next_layer_dict['indices_absolute'] = refinement_dict[-1]['indices_absolute'][batch_indices, select_indices]
-                _next_layer_dict['coarse_score'] = {}
-                for score_key in self._config.trajectory_pdm_weight.keys():
-                    _next_layer_dict['coarse_score'][score_key] = last_layer_result[score_key][batch_indices, select_indices]
+                # _next_layer_dict['coarse_score'] = {}
+                # for score_key in self._config.trajectory_pdm_weight.keys():
+                #     _next_layer_dict['coarse_score'][score_key] = last_layer_result[score_key][batch_indices, select_indices]
                 
                 refinement_dict.append(_next_layer_dict)
             
