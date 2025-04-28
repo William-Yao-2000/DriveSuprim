@@ -13,7 +13,7 @@ stage_layers=3
 topks=256
 
 
-dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs/stage_layers_$stage_layers-topks_$topks-optimize_prev_frame_traj_for_ec
+dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs/stage_layers_$stage_layers-topks_$topks-optimize_prev_frame_traj_for_ec_v2
 
 
 command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
