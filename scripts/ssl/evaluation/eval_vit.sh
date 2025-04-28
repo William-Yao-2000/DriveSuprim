@@ -49,5 +49,5 @@ eval $command_string
 : '
 usage:
 bash scripts/ssl/evaluation/eval_vit.sh \
-    4 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/single_stage \
+    4 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/single_stage
 '

@@ -1,9 +1,9 @@
 ## 1. testing
 ### 0-1. metric caching (ori-two_stage)
 ```bash
-python navsim/planning/script/run_metric_caching.py train_test_split=navtest_two_stage \
+python navsim/planning/script/run_metric_caching.py train_test_split=navtest \
     worker.threads_per_node=192 \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori-two_stage \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori \
     --config-name default_metric_caching
 ```
 
@@ -76,11 +76,10 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_debug.py
     agent.config.refinement.stage_layers=3+3 \
     agent.config.refinement.topks=256+64 \
     agent.config.lab.use_first_stage_traj_in_infer=false \
-    agent.checkpoint_path='/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp_v2/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage-bug_2_sigmoids/stage_layers_3+3-topks_256+64/epoch\=04-step\=6650.ckpt' \
     experiment_name=debug \
     +cache_path=null \
-    metric_cache_path=/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp_v2/metric_cache/test/ori-two_stage \
-    train_test_split=navtest_two_stage
+    metric_cache_path=/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp_v2/metric_cache/warmup_two_stage \
+    train_test_split=warmup_two_stage
 ```
 
 
@@ -395,12 +394,11 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.ego_perturb.rotation.enable=true \
     agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
     agent.config.student_rotation_ensemble=3 \
-    agent.config.soft_label_score_diff_thresh=0.5 \
     agent.config.refinement.use_multi_stage=true \
-    agent.config.refinement.num_refinement_stage=1 \
-    agent.config.refinement.stage_layers=3 \
-    agent.config.refinement.topks=64 \
-    agent.config.lab.use_imi_learning_in_refinement=true \
+    agent.config.refinement.num_refinement_stage=2 \
+    agent.config.refinement.stage_layers=3+3 \
+    agent.config.refinement.topks=256+64 \
+    agent.config.lab.optimize_prev_frame_traj_for_ec=true \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null
