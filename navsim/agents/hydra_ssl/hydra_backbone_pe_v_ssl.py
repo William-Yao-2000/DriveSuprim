@@ -1,6 +1,7 @@
 """
 Implements the TransFuser vision backbone.
 """
+import os
 
 import timm
 import torch
@@ -91,4 +92,7 @@ class HydraBackbonePE(nn.Module):
     
     def forward_tup(self, image, **kwargs):
         image_feat_tup = self.image_encoder(image, **kwargs)[-1]
-        return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1])
+        if self.config.lab.use_higher_res_feat_in_refinement:
+            return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1], image_feat_tup[0])
+        else:
+            return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1])

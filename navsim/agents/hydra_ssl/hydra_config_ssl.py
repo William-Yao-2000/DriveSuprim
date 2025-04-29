@@ -113,6 +113,7 @@ class LabConfig:
     ban_soft_label_loss: bool = False
     optimize_prev_frame_traj_for_ec: bool = False
     refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
+    use_higher_res_feat_in_refinement: bool = False
 
 
 @dataclass

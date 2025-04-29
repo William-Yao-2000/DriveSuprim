@@ -142,6 +142,7 @@ config:
     ban_soft_label_loss: false
     optimize_prev_frame_traj_for_ec: false
     refinement_metrics: 'all'
+    use_higher_res_feat_in_refinement: false
 
 
 checkpoint_path: null

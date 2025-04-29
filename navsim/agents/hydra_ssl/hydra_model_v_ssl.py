@@ -85,6 +85,8 @@ class HydraModel(nn.Module):
             'patch_token': img_feat_tup[0],  # [b, c_img, h//32, w//32], the patch size of vit is only 16, but use a avg pooling
             'class_token': img_feat_tup[1],
         }
+        if self._config.lab.use_higher_res_feat_in_refinement:
+            img_feat_dict['higher_res_feat'] = img_feat_tup[2]
         img_features = img_feat_dict['patch_token']
         img_features = self.downscale_layer(img_features).flatten(-2, -1)  # [b, c, h//32 * w//32]
         img_features = img_features.permute(0, 2, 1)  # [b, h//32 * w//32, c]
@@ -100,8 +102,8 @@ class HydraModel(nn.Module):
                 interpolated_traj=None,
                 tokens=None) -> Dict[str, torch.Tensor]:
         
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         output: Dict[str, torch.Tensor] = {}
 
@@ -137,7 +139,10 @@ class HydraModel(nn.Module):
         trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj)
 
         if self.use_multi_stage:
-            bev_feat_fg = img_feat_dict['patch_token']  # [bs, c_vit, w, h]
+            if self._config.lab.use_higher_res_feat_in_refinement:
+                bev_feat_fg = img_feat_dict['higher_res_feat']
+            else:
+                bev_feat_fg = img_feat_dict['patch_token']  # [bs, c_vit, w, h]
             final_traj = self._trajectory_offset_head(bev_feat_fg, trajectory['refinement'])
             trajectory['final_traj'] = final_traj
             
@@ -285,8 +290,8 @@ class HydraTrajHead(nn.Module):
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
@@ -523,6 +528,7 @@ class TrajOffsetHead(nn.Module):
         
         for i in range(self.num_stage):
             _bev_feat_fg = self.downscale_layers[i](bev_feat_fg).flatten(2)
+            _bev_feat_fg = _bev_feat_fg.permute(0, 2, 1)  # FIXBUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             status_encoding = refinement_dict[-1]['trajs_status']  # [bs, topk_stage_i, c]
             tr_out_lst = self.transformer_blocks[i](status_encoding, _bev_feat_fg)  # [layer_stage_i, bs, topk_stage_i, c]
 
