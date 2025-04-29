@@ -22,8 +22,8 @@ if [ "$change_loss_weight" = "true" ]; then
     dir="$dir-change_loss_weight"
 fi
 
-if [ "$use_imi_learning_in_refinement" = "true" ]; then
-    dir="$dir-use_imi_learning_in_refinement"
+if [ "$use_imi_learning_in_refinement" = "false" ]; then
+    dir="$dir-not_use_imi_learning_in_refinement"
 fi
 
 
