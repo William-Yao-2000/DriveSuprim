@@ -40,7 +40,7 @@ submit_job \
 : '
 usage:
 bash scripts/slurm_bash/ssl/evaluation/eval_vit-multi_stage.sh \
-    2 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-optimize_prev_frame_traj_for_ec_v2 \
+    1 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256 \
     interactive_singlenode \
     -num_refinement_stage=1 -stage_layers=3 -topks=256
 '
