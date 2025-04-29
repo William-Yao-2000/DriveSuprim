@@ -7,8 +7,6 @@ num_refinement_stage=1
 stage_layers=3
 topks=256
 
-refinement_metrics=$3
-
 inference_model="teacher"
 
 # Format epoch with leading zero
@@ -21,9 +19,9 @@ metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep-one_stage-refinement_$refinement_metrics"
+    experiment_name="${dir}/test-${padded_epoch}ep-one_stage-adjust_refinement_score_weight"
 else
-    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-one_stage-refinement_$refinement_metrics"
+    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-one_stage-adjust_refinement_score_weight"
 fi
 
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
@@ -42,7 +40,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     agent.config.refinement.stage_layers=$stage_layers \
     agent.config.refinement.topks=$topks \
     agent.config.lab.use_first_stage_traj_in_infer=false \
-    agent.config.lab.refinement_metrics=$refinement_metrics \
+    agent.config.lab.adjust_refinement_score_weight=true \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
@@ -58,7 +56,6 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/evaluation/lab/eval_vit-multi_stage-partial_refinement_metrics.sh \
-    4 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-refinement_metrics_dac_ep_lk_pdms \
-    dac_ep_lk_pdms
+bash scripts/ssl/evaluation/lab/eval_vit-multi_stage-adjust_refinement_score_weight.sh \
+    4 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-adjust_refinement_score_weight
 '
