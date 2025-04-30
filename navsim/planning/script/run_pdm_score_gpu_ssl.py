@@ -1,7 +1,3 @@
-"""
-Two stage eval for warmup
-"""
-
 import logging
 import os
 import pickle
@@ -13,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 import hydra
+import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch.distributed as dist
@@ -44,8 +41,6 @@ CONFIG_PATH = "config/pdm_scoring"
 CONFIG_NAME = "default_run_pdm_score_gpu_ssl"
 
 
-# TODO gpu inference
-
 def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[pd.DataFrame]:
     """
     Helper function to run PDMS evaluation in.
@@ -63,12 +58,9 @@ def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]
     simulator: PDMSimulator = instantiate(cfg.simulator)
     scorer: PDMScorer = instantiate(cfg.scorer)
     assert (
-            simulator.proposal_sampling == scorer.proposal_sampling
+        simulator.proposal_sampling == scorer.proposal_sampling
     ), "Simulator and scorer proposal sampling has to be identical"
-    # traffic_agents_policy: AbstractTrafficAgentsPolicy = instantiate(
-    #     cfg.traffic_agents_policy, simulator.proposal_sampling
-    # )
-    
+
     metric_cache_loader = MetricCacheLoader(Path(cfg.metric_cache_path))
     scene_filter: SceneFilter = instantiate(cfg.train_test_split.scene_filter)
     scene_filter.log_names = log_names
@@ -95,11 +87,12 @@ def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]
 
     for idx, (token) in enumerate(tokens_to_evaluate_stage_one):
         logger.info(
-            f"Processing scenario {idx + 1} / {len(tokens_to_evaluate_stage_one)} in thread_id={thread_id}, node_id={node_id}"
+            f"Processing stage one reactive scenario {idx + 1} / {len(tokens_to_evaluate_stage_one)} in thread_id={thread_id}, node_id={node_id}"
         )
         try:
             metric_cache = metric_cache_loader.get_from_token(token)
             trajectory = model_trajectory[token]['trajectory']
+
             score_row_stage_one, ego_simulated_states = pdm_score(
                 metric_cache=metric_cache,
                 model_trajectory=trajectory,
@@ -148,6 +141,7 @@ def run_pdm_score_wo_inference(args: List[Dict[str, Union[List[str], DictConfig]
         try:
             metric_cache = metric_cache_loader.get_from_token(token)
             trajectory = model_trajectory[token]['trajectory']
+
             score_row_stage_two, ego_simulated_states = pdm_score(
                 metric_cache=metric_cache,
                 model_trajectory=trajectory,
@@ -200,7 +194,7 @@ def main(cfg: DictConfig) -> None:
     # gpu inference
     agent: AbstractAgent = instantiate(cfg.agent)
     agent.initialize()
-    # Extract scenes based on scene-loader to know which tokens to distribute across workers
+
     scene_filter = instantiate(cfg.train_test_split.scene_filter)
     scene_loader_inference = SceneLoader(
         synthetic_sensor_path=Path(cfg.synthetic_sensor_path),
@@ -288,7 +282,7 @@ def main(cfg: DictConfig) -> None:
     score_rows: List[pd.DataFrame] = worker_map(worker, run_pdm_score_wo_inference, data_points)
 
     pdm_score_df = pd.concat(score_rows)
-    
+
     try:
         raw_mapping = cfg.train_test_split.reactive_all_mapping
         all_mappings: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
@@ -304,7 +298,7 @@ def main(cfg: DictConfig) -> None:
         pseudo_closed_loop_valid = True
 
     except Exception:
-        logger.warning("----------- Failed to calculate pseudo closed-loop weights:")
+        logger.warning("----------- Failed to calculate pseudo closed-loop weights or comfort:")
         traceback.print_exc()
         pdm_score_df["weight"] = 1.0
         pseudo_closed_loop_valid = False
@@ -325,29 +319,62 @@ def main(cfg: DictConfig) -> None:
         )
     ]
 
-    # Calculate average score of all frames
-    average_all_frames_extended_pdm_score_row = pdm_score_df[score_cols].mean(skipna=True)
-    average_all_frames_extended_pdm_score_row["token"] = "average_all_frames_extended_pdm_score"
-    average_all_frames_extended_pdm_score_row["valid"] = pdm_score_df["valid"].all()
-
-    # Calculate pseudo closed loop score with weighted average
-    extended_pdm_score_row = calculate_individual_mapping_scores(
+    pcl_group_score, pcl_stage1_score, pcl_stage2_score = calculate_individual_mapping_scores(
         pdm_score_df[score_cols + ["token", "weight"]], all_mappings
     )
-    extended_pdm_score_row["token"] = "extended_pdm_score"
-    extended_pdm_score_row["valid"] = pseudo_closed_loop_valid
 
-    # Original frames average
-    original_frames = pdm_score_df[pdm_score_df["frame_type"] == SceneFrameType.ORIGINAL]
-    average_expert_frames_extended_pdm_score_row = original_frames[score_cols].mean(skipna=True)
-    average_expert_frames_extended_pdm_score_row["token"] = "average_expert_frames_extended_pdm_score"
-    average_expert_frames_extended_pdm_score_row["valid"] = original_frames["valid"].all()
+    for col in score_cols:
+        stage_one_mask = pdm_score_df["frame_type"] == SceneFrameType.ORIGINAL
+        stage_two_mask = pdm_score_df["frame_type"] == SceneFrameType.SYNTHETIC
 
-    # append average and pseudo closed loop scores
+        pdm_score_df.loc[stage_one_mask, f"{col}_stage_one"] = pdm_score_df.loc[stage_one_mask, col]
+        pdm_score_df.loc[stage_two_mask, f"{col}_stage_two"] = pdm_score_df.loc[stage_two_mask, col]
+
+    pdm_score_df.drop(columns=score_cols, inplace=True)
+    pdm_score_df["score"] = pdm_score_df["score_stage_one"].combine_first(pdm_score_df["score_stage_two"])
+    pdm_score_df.drop(columns=["score_stage_one", "score_stage_two"], inplace=True)
+
+    stage1_cols = [f"{col}_stage_one" for col in score_cols if col != "score"]
+    stage2_cols = [f"{col}_stage_two" for col in score_cols if col != "score"]
+    score_cols = stage1_cols + stage2_cols + ["score"]
+
     pdm_score_df = pdm_score_df[["token", "valid"] + score_cols]
-    pdm_score_df.loc[len(pdm_score_df)] = average_all_frames_extended_pdm_score_row
-    pdm_score_df.loc[len(pdm_score_df)] = average_expert_frames_extended_pdm_score_row
-    pdm_score_df.loc[len(pdm_score_df)] = extended_pdm_score_row
+
+    summary_rows = []
+
+    stage1_row = pd.Series(index=pdm_score_df.columns, dtype=object)
+    stage1_row["token"] = "extended_pdm_score_stage_one"
+    stage1_row["valid"] = pseudo_closed_loop_valid
+    stage1_row["score"] = pcl_stage1_score.get("score", np.nan)
+    for col in pcl_stage1_score.index:
+        if col not in ["token", "valid", "score"]:
+            stage1_row[f"{col}_stage_one"] = pcl_stage1_score[col]
+    summary_rows.append(stage1_row)
+
+    stage2_row = pd.Series(index=pdm_score_df.columns, dtype=object)
+    stage2_row["token"] = "extended_pdm_score_stage_two"
+    stage2_row["valid"] = pseudo_closed_loop_valid
+    stage2_row["score"] = pcl_stage2_score.get("score", np.nan)
+    for col in pcl_stage2_score.index:
+        if col not in ["token", "valid", "score"]:
+            stage2_row[f"{col}_stage_two"] = pcl_stage2_score[col]
+    summary_rows.append(stage2_row)
+
+    combined_row = pd.Series(index=pdm_score_df.columns, dtype=object)
+    combined_row["token"] = "extended_pdm_score_combined"
+    combined_row["valid"] = pseudo_closed_loop_valid
+    combined_row["score"] = pcl_group_score["score"]
+
+    for col in pcl_stage1_score.index:
+        if col not in ["token", "valid", "score"]:
+            combined_row[f"{col}_stage_one"] = pcl_stage1_score[col]
+
+    for col in pcl_stage2_score.index:
+        if col not in ["token", "valid", "score"]:
+            combined_row[f"{col}_stage_two"] = pcl_stage2_score[col]
+    summary_rows.append(combined_row)
+
+    pdm_score_df = pd.concat([pdm_score_df, pd.DataFrame(summary_rows)], ignore_index=True)
 
     save_path = Path(cfg.output_dir)
     timestamp = datetime.now().strftime("%Y.%m.%d.%H.%M.%S")
@@ -358,7 +385,7 @@ def main(cfg: DictConfig) -> None:
         Finished running evaluation.
             Number of successful scenarios: {num_sucessful_scenarios}.
             Number of failed scenarios: {num_failed_scenarios}.
-            Final extended pdm score of valid results: {pdm_score_df[pdm_score_df["token"] == "extended_pdm_score"]["score"].iloc[0]}.
+            Final extended pdm score of valid results: {pdm_score_df[pdm_score_df["token"] == "extended_pdm_score_combined"]["score"].iloc[0]}.
             Results are stored in: {save_path / f"{timestamp}.csv"}.
         """
     )
