@@ -25,6 +25,10 @@ else
     experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-warmup_two_stage"
 fi
 
+if [ "$use_first_stage_traj_in_infer" = "true" ]; then
+    experiment_name="$experiment_name-use_first_stage_traj_in_infer"
+fi
+
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
 python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     +debug=false \
