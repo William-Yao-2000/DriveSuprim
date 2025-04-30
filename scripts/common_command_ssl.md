@@ -397,8 +397,7 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.refinement.use_multi_stage=true \
     agent.config.refinement.num_refinement_stage=2 \
     agent.config.refinement.stage_layers=3+3 \
-    agent.config.refinement.topks=256+64 \
-    agent.config.lab.optimize_prev_frame_traj_for_ec=true \
+    agent.config.refinement.topks=128+64 \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null
