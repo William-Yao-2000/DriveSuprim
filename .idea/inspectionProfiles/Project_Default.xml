@@ -4,7 +4,7 @@
     <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
       <option name="ignoredPackages">
         <value>
-          <list size="53">
+          <list size="60">
             <item index="0" class="java.lang.String" itemvalue="httpx" />
             <item index="1" class="java.lang.String" itemvalue="click" />
             <item index="2" class="java.lang.String" itemvalue="spconv" />
@@ -58,6 +58,13 @@
             <item index="50" class="java.lang.String" itemvalue="onnx" />
             <item index="51" class="java.lang.String" itemvalue="protobuf" />
             <item index="52" class="java.lang.String" itemvalue="xformers" />
+            <item index="53" class="java.lang.String" itemvalue="pydantic" />
+            <item index="54" class="java.lang.String" itemvalue="transformers" />
+            <item index="55" class="java.lang.String" itemvalue="diffusers" />
+            <item index="56" class="java.lang.String" itemvalue="ml-collections" />
+            <item index="57" class="java.lang.String" itemvalue="wandb" />
+            <item index="58" class="java.lang.String" itemvalue="inflect" />
+            <item index="59" class="java.lang.String" itemvalue="accelerate" />
           </list>
         </value>
       </option>
