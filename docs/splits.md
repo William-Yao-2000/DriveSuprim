@@ -1,15 +1,15 @@
 # Dataset splits vs. filtered training / test splits
 
 The NAVSIM framework utilizes several dataset splits for standardized training and evaluating agents.
-All of them use the OpenScene dataset that is divided into the dataset splits `mini`, `trainval`,` test`, `warmup_two_stage`, `private_test_e2e`, which can all be downloaded separately.
+All of them use the OpenScene dataset that is divided into the dataset splits `mini`, `trainval`,` test`, which can all be downloaded separately.
 
-It is possible to run trainings and evaluations directly on these sets (see `Standard` in table below).
+It is possible to run trainings and evaluations directly on these sets (see `OpenScene` in table below).
 Alternatively, you can run trainings and evaluations on training and validation splits that were filtered for challenging scenarios (see `NAVSIM` in table below), which is the recommended option for producing comparable and competitive results efficiently.
 In contrast to the dataset splits which refer to a downloadable set of logs, the training / test splits are implemented as scene filters, which define how scenes are extracted from these logs.
 
 The NAVSIM training / test splits subsample the OpenScene dataset splits.
 Moreover, the NAVSIM splits include overlapping scenes, while the Standard splits are non-overlapping.
-Specifically, `navtrain` is based on the `trainval` data and `navtest` on the `test` data.
+Specifically, `navtrain` is based on the `trainval` data and `navtest` and `navhard_two_stage` on the `test` data.
 
 As the `trainval` sensor data is very large, we provide a separate download link, which loads only the frames needed for `navtrain`.
 This eases access for users that only want to run the `navtrain` split and not the `trainval` split. If you already downloaded the full `trainval` sensor data, it is **not necessary** to download the `navtrain` frames as well.
@@ -18,7 +18,6 @@ The logs are always the complete dataset split.
 ## Overview
 
 The Table belows offers an overview on the training and test splits supported by NAVSIM.
-In Navsim-v1.1, the training/test split can bet set with a single config parameter given in the table.
 
 <table border="0">
     <tr>
@@ -30,7 +29,7 @@ In Navsim-v1.1, the training/test split can bet set with a single config paramet
         <th>Config parameters</th>
     </tr>
     <tr>
-        <td rowspan="3">Standard</td>
+        <td rowspan="3">OpenScene</td>
         <td>trainval</td>
         <td>Large split for training and validating agents with regular driving recordings. Corresponds to nuPlan and downsampled to 2HZ.</td>
         <td>14GB</td>
@@ -58,10 +57,10 @@ In Navsim-v1.1, the training/test split can bet set with a single config paramet
         </td>
     </tr>
     <tr>
-        <td rowspan="2">NAVSIM</td>
+        <td rowspan="3">NAVSIM</td>
         <td>navtrain</td>
-        <td>Standard split for training agents in NAVSIM with non-trivial driving scenes. Sensors available separately in <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain.sh">download_navtrain.sh</a>.</td>
-        <td>-</td>
+        <td>Standard split for training agents in NAVSIM with non-trivial driving scenes. Sensors available separately in <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain_aws.sh">download_navtrain_aws.sh</a> (AWS download) or <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain_hf.sh">download_navtrain_hf.sh</a> (HuggingFace download).</td>
+        <td>14GB</td>
         <td>445GB*</td>
         <td>
         train_test_split=navtrain
@@ -70,29 +69,38 @@ In Navsim-v1.1, the training/test split can bet set with a single config paramet
     <tr>
         <td>navtest</td>
         <td>Standard split for testing agents in NAVSIM with non-trivial driving scenes. Available as a filter for test split.</td>
-        <td>-</td>
-        <td>-</td>
+        <td>983MB</td>
+        <td>223GB</td>
         <td>
         train_test_split=navtest
         </td>
     </tr>
     <tr>
+        <td>navhard_two_stage</td>
+        <td>Standard split for testing agents in NAVSIM v2 with real and synthetic driving scenes. Synthetic frames downloadable via <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_navhard_two_stage.sh">download_navhard_two_stage.sh</a>.</td>
+        <td>892MB</td>
+        <td>31GB</td>
+        <td>
+        train_test_split=navhard_two_stage
+        </td>
+    </tr>
+    <tr>
         <td rowspan="2">Competition</td>
         <td>warmup_two_stage</td>
-        <td>Warmup test split to validate submission on hugging face. Available as a filter for test split.</td>
-        <td>27M</td>
+        <td>Warmup test split to validate submission on hugging face. Synthetic frames downloadable via <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_warmup_two_stage.sh">download_warmup_two_stage.sh</a>.</td>
+        <td>27MB</td>
         <td>1.2G</td>
         <td>
         train_test_split=warmup_two_stage
         </td>
     </tr>
     <tr>
-        <td>private_test_e2e</td>
-        <td>Private test split for the challenge leaderboard on hugging face.</td>
-        <td><1GB</td>
-        <td>25GB</td>
+        <td>private_test_hard_two_stage</td>
+        <td>Private test split for the challenge leaderboard on hugging face. Original and synthetic frames downloadable via <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_private_test_hard_two_stage.sh">download_private_test_hard_two_stage.sh</a></td>
+        <td>14MB</td>
+        <td>11GB</td>
         <td>
-        train_test_split=private_test_e2e
+        train_test_split=private_test_hard_two_stage
         </td>
     </tr>
 </table>
@@ -103,13 +111,15 @@ In Navsim-v1.1, the training/test split can bet set with a single config paramet
 
 The standard splits `trainval`, `test`, and `mini` are from the OpenScene dataset. Note that the data corresponds to the nuPlan dataset with a lower frequency of 2Hz. You can download all standard splits over Hugging Face with the bash scripts in [download](../download)
 
-NAVSIM provides a subset and filter of the `trainval` split, called `navtrain`. The `navtrain` split facilitates a standardized training scheme and requires significantly less sensor data storage than `travel` (445GB vs. 2100GB). If your agents don't need historical sensor inputs, you can download `navtrain` without history, which requires 300GB of storage. Note that `navtrain` can be downloaded separately via [download_navtrain.sh](https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain.sh) but still requires access to the `trainval` logs. Similarly, the `navtest` split enables a standardized set for testing agents with a provided scene filter. Both `navtrain` and `navtest` are filtered to increase interesting samples in the sets.
+NAVSIM provides a subset and filter of the `trainval` split, called `navtrain`. The `navtrain` split facilitates a standardized training scheme and requires significantly less sensor data storage than `travel` (445GB vs. 2100GB). If your agents don't need historical sensor inputs, you can download `navtrain` without history, which requires 300GB of storage. Note that the sensor data for `navtrain` can be downloaded separately via <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain_aws.sh">download_navtrain_aws.sh</a> or <a href="https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain_hf.sh">download_navtrain_hf.sh</a> but it still requires access to the `trainval` logs.
 
-For the challenge on Hugging Face, we provide the `warmup_two_stage` and `private_test_e2e` for the warm-up and challenge track, respectively. Note that `private_test_e2e` requires you to download the data, while `warmup_two_stage` is a scene filter for the `test` split.
+The `navtest` split enables a standardized set for testing agents in NAVSIM v1 with a provided scene filter. Similarly, the `navhard_two_stage` split split facilitates pseudo closed-loop simulation for evaluation in NAVSIM v2. `navtrain`, `navtest` and `navhard_two_stage` are filtered to increase interesting samples in the sets.
+
+For the challenge on Hugging Face, we provide the `warmup_two_stage` and `private_test_e2e` for the warm-up and challenge track, respectively.
 
 ## Troubleshooting
 
-As previous users reported missing files when downloading `navtrain`, we provide MD5 checksums for the `.tgz` files to identify corrupted downloads. We recommend to re-download `navtrain` without deleting the `.tgz` files (i.e. removing Line 12 and 22 in [download_navtrain.sh](https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain.sh)) and running:
+As previous users reported missing files when downloading `navtrain`, we provide MD5 checksums for the `.tgz` files to identify corrupted downloads. We recommend to re-download `navtrain` without deleting the `.tgz` files (i.e. removing Line 12 and 22 in [download_navtrain_aws.sh](https://github.com/autonomousvision/navsim/blob/main/download/download_navtrain_aws.sh)) and running:
 
 ```bash
 echo "6f92f38d5f03ed852da7872a7122bdd2  navtrain_current_1.tgz" | md5sum -c -
