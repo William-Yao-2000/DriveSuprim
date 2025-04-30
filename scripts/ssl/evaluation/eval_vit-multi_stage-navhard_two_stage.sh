@@ -6,6 +6,7 @@ dir=${2:-"training/ssl/ori/lr_baseline"}
 num_refinement_stage=$3
 stage_layers=$4
 topks=$5
+use_first_stage_traj_in_infer=${6:-"false"}
 
 inference_model="teacher"
 
@@ -24,6 +25,10 @@ else
     experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-navhard_two_stage"
 fi
 
+if [ "$use_first_stage_traj_in_infer" = "true" ]; then
+    experiment_name="$experiment_name-use_first_stage_traj_in_infer"
+fi
+
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
 python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     +debug=false \
@@ -39,7 +44,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     agent.config.refinement.num_refinement_stage=$num_refinement_stage \
     agent.config.refinement.stage_layers=$stage_layers \
     agent.config.refinement.topks=$topks \
-    agent.config.lab.use_first_stage_traj_in_infer=false \
+    agent.config.lab.use_first_stage_traj_in_infer=$use_first_stage_traj_in_infer \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
