@@ -106,6 +106,7 @@ class LabConfig:
     num_top_k: int = 64
     test_full_vocab_pdm_score_path: str = "???"
     use_first_stage_traj_in_infer: bool = False
+
     change_loss_weight: bool = False
     use_imi_learning_in_refinement: bool = True
     adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
@@ -114,6 +115,9 @@ class LabConfig:
     optimize_prev_frame_traj_for_ec: bool = False
     refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
     use_higher_res_feat_in_refinement: bool = False
+
+    use_cosine_ema_scheduler: bool = False
+    ema_momentum_start: float = 0.99
 
 
 @dataclass
