@@ -68,5 +68,5 @@ eval $command_string
 usage:
 bash scripts/ssl/evaluation/lab/eval_vit-multi_stage-not_use_imi_in_refinement-navhard_two_stage.sh \
     5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-not_use_imi_learning_in_refinement \
-    false
+    true
 '
