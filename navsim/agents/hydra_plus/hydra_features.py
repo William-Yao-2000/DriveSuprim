@@ -48,8 +48,10 @@ class HydraFeatureBuilder(AbstractFeatureBuilder):
         features = {}
 
         features["camera_feature"] = self._get_camera_feature(agent_input)
-        if self._config.use_back_view:
-            features["camera_feature_back"] = self._get_camera_feature_back(agent_input)
+        features["camera_feature_back"] = self._get_camera_feature_back_multiple(agent_input)
+        if self._config.use_lr_view:
+            features["camera_feature_left"] = self._get_camera_feature_single(agent_input, 'left')
+            features["camera_feature_right"] = self._get_camera_feature_single(agent_input, 'right')
 
         ego_status_list = []
         for i in range(2):
@@ -100,20 +102,58 @@ class HydraFeatureBuilder(AbstractFeatureBuilder):
 
         return image_list
 
-    def _get_camera_feature_back(self, agent_input: AgentInput) -> torch.Tensor:
-        cameras = agent_input.cameras[-1]
+    def _get_camera_feature_single(self, agent_input: AgentInput, view) -> torch.Tensor:
+        """
+        Extract stitched camera from AgentInput
+        :param agent_input: input dataclass
+        :return: stitched front view image as torch tensor
+        """
+        seq_len = self._config.seq_len
+        cameras = agent_input.cameras[-seq_len:]
+        image_list = []
+        for camera in cameras:
+            image = camera.cam_l0.image
+            if image is not None and image.size > 0 and np.any(image):
+                if view == 'left':
+                    single_img = camera.cam_l1.image[28:-28]
+                elif view == 'right':
+                    single_img = camera.cam_r1.image[28:-28]
+                else:
+                    raise ValueError('Unsupported view')
+                resized_image = cv2.resize(single_img, (int(self._config.camera_width * 1920 / 4096), self._config.camera_height))
+                tensor_image = transforms.ToTensor()(resized_image)
+                image_list.append(tensor_image)
+            else:
+                image_list.append(None)
 
-        # Crop to ensure 4:1 aspect ratio
-        l2 = cameras.cam_l2.image[28:-28, 416:-416]
-        b0 = cameras.cam_b0.image[28:-28]
-        r2 = cameras.cam_r2.image[28:-28, 416:-416]
+        return image_list
 
-        # stitch l0, f0, r0 images
-        stitched_image = np.concatenate([l2, b0, r2], axis=1)
-        resized_image = cv2.resize(stitched_image, (self._config.camera_width, self._config.camera_height))
-        tensor_image = transforms.ToTensor()(resized_image)
 
-        return tensor_image
+    def _get_camera_feature_back_multiple(self, agent_input: AgentInput) -> torch.Tensor:
+        """
+        Extract stitched camera from AgentInput
+        :param agent_input: input dataclass
+        :return: stitched front view image as torch tensor
+        """
+        seq_len = self._config.seq_len
+        cameras = agent_input.cameras[-seq_len:]
+        assert (len(cameras) == seq_len)
+        image_list = []
+        for camera in cameras:
+            image = camera.cam_l0.image
+            if image is not None and image.size > 0 and np.any(image):
+                l2 = camera.cam_l2.image[28:-28, 416:-416]
+                b0 = camera.cam_b0.image[28:-28]
+                r2 = camera.cam_r2.image[28:-28, 416:-416]
+                # stitch l0, f0, r0 images
+                stitched_image = np.concatenate([l2, b0, r2], axis=1)
+                resized_image = cv2.resize(stitched_image, (self._config.camera_width, self._config.camera_height))
+                tensor_image = transforms.ToTensor()(resized_image)
+                image_list.append(tensor_image)
+            else:
+                image_list.append(None)
+
+        return image_list
 
 
 class HydraTargetBuilder(AbstractTargetBuilder):

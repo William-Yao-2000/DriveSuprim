@@ -3,8 +3,10 @@ Implements the TransFuser vision backbone.
 """
 
 import timm
+import torch
 from torch import nn
 
+from navsim.agents.backbones.eva import EVAViT
 from navsim.agents.backbones.internimage import InternImage
 from navsim.agents.backbones.swin import SwinTransformerBEVFT
 from navsim.agents.backbones.vov import VoVNet
@@ -73,8 +75,34 @@ class HydraBackbone(nn.Module):
                 'resnet34', pretrained=False, features_only=True
             )
             vit_channels = 512
+        elif config.backbone_type == 'sptr':
+            img_vit_size = (config.camera_height, config.camera_width)
+            self.image_encoder = EVAViT(
+                img_size=img_vit_size[0],  # img_size for short side
+                patch_size=16,
+                window_size=16,
+                global_window_size=img_vit_size[0] // 16,
+                # If use square image (e.g., set global_window_size=0, else global_window_size=img_size // 16)
+                in_chans=3,
+                embed_dim=1024,
+                depth=24,
+                num_heads=16,
+                mlp_ratio=4 * 2 / 3,
+                window_block_indexes=(
+                        list(range(0, 2)) + list(range(3, 5)) + list(range(6, 8)) + list(range(9, 11)) + list(
+                    range(12, 14)) + list(range(15, 17)) + list(range(18, 20)) + list(range(21, 23))
+                ),
+                qkv_bias=True,
+                drop_path_rate=0.3,
+                with_cp=True,
+                flash_attn=False,
+                xformers_attn=True
+            )
+            self.image_encoder.init_weights(config.sptr_ckpt)
+            vit_channels = 1024
+
         else:
-            raise ValueError
+            raise ValueError('Unsupported backbone in hydra_backbone')
 
         self.avgpool_img = nn.AdaptiveAvgPool2d(
             (self.config.img_vert_anchors, self.config.img_horz_anchors)
@@ -82,5 +110,31 @@ class HydraBackbone(nn.Module):
         self.img_feat_c = vit_channels
 
     def forward(self, image):
-        image_features = self.image_encoder(image)[-1]
+        B, C, H, W = image.shape
+        if self.backbone_type == 'vov':
+            image_features = self.image_encoder(image)[-1]
+        elif self.backbone_type == 'sptr':
+            half_w = W // 2
+            image_left = image[..., :half_w]
+            image_right = image[..., half_w:]
+            image_features_left = self.image_encoder(image_left)[-1]
+            image_features_right = self.image_encoder(image_right)[-1]
+            image_features = torch.cat([
+                image_features_left, image_features_right
+            ], -1)
+        elif self.backbone_type == 'vit':
+            quarter_w = W // 4
+            image_1 = image[..., :quarter_w]
+            image_2 = image[..., quarter_w:2 * quarter_w]
+            image_3 = image[..., 2 * quarter_w:3 * quarter_w]
+            image_4 = image[..., 3 * quarter_w:]
+            image_f_1 = self.image_encoder(image_1)[-1]
+            image_f_2 = self.image_encoder(image_2)[-1]
+            image_f_3 = self.image_encoder(image_3)[-1]
+            image_f_4 = self.image_encoder(image_4)[-1]
+            image_features = torch.cat([
+                image_f_1, image_f_2, image_f_3, image_f_4
+            ], -1)
+        else:
+            raise ValueError('Forward wrong backbone')
         return self.avgpool_img(image_features)

@@ -14,8 +14,34 @@ NAVSIM_DEVKIT_ROOT = os.environ.get("NAVSIM_DEVKIT_ROOT")
 @dataclass
 class DPConfig(TransfuserConfig):
     scheduler: str = 'default'
+
+    is_rl_training: bool = False
+
+    num_proposals: int = 100
+
     dp_layers: int = 5
+    dp_loss_weight: float = 1.0
     version: str = 'v1'
+
+    reward_source: str = 'hydra'
+    # whether to optimize hydra
+    open_hydra: bool = False
+    hydra_filter: bool = False
+    reinforce: bool = False
+    pdm_replace_hydra_scores: bool = False
+    hydra_topk: int = 10
+    metric_cache_path: str = f'{os.getenv("NAVSIM_EXP_ROOT")}/navtrain_metric_cache'
+
+    norm_accel: bool = False
+    denoising_timesteps: int = 100
+    use_temporal_bev_kv: bool = False
+
+    # PPO
+    adv_clip_max: int = 5
+    clip_range: float = 0.01
+
+    # denoising
+    stdev_clip: float = 0.1
 
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0
@@ -37,6 +63,7 @@ class DPConfig(TransfuserConfig):
     vocab_path: str = None
     normalize_vocab_pos: bool = False
     num_ego_status: int = 1
+    fusion_layers: int = 3
 
     ckpt_path: str = None
     sigma: float = 0.5
@@ -47,6 +74,8 @@ class DPConfig(TransfuserConfig):
     extra_traj_layer: bool = False
 
     use_back_view: bool = False
+    use_lr_view: bool = False
+
 
     extra_tr: bool = False
     vadv2_head_nhead: int = 8
@@ -73,6 +102,7 @@ class DPConfig(TransfuserConfig):
 
     lr_mult_backbone: float = 1.0
     backbone_wd: float = 0.0
+    weight_decay: float = 0.0
 
     # lidar backbone
     lidar_architecture: str = "resnet34"
