@@ -159,6 +159,9 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         seq_len = self._config.seq_len
         cameras = agent_input.cameras[-seq_len:]  # List[Cameras]
         assert(len(cameras) == seq_len)
+
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         res['ori_teacher'] = []
         res['ori'] = []
@@ -166,34 +169,60 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         for camera in cameras:
             image = camera.cam_l0.image
             if image is not None and image.size > 0 and np.any(image):
+                n_camera = self._config.n_camera
+
                 # Crop to ensure 4:1 aspect ratio
                 l0 = camera.cam_l0.image[28:-28, 416:-416]
                 f0 = camera.cam_f0.image[28:-28]
                 r0 = camera.cam_r0.image[28:-28, 416:-416]
                 l1 = camera.cam_l1.image[28:-28]
                 r1 = camera.cam_r1.image[28:-28]
+                if n_camera >= 5:
+                    l2 = camera.cam_l2.image[28:-28, :-1100]
+                    r2 = camera.cam_r2.image[28:-28, 1100:]
+                    b0_left = camera.cam_b0.image[28:-28, :1080]
+                    b0_right = camera.cam_b0.image[28:-28, -1080:]
 
-                ori_image = np.concatenate([l0, f0, r0], axis=1)
+                if n_camera == 1:
+                    ori_image = f0
+                elif n_camera == 3:
+                    ori_image = np.concatenate([l0, f0, r0], axis=1)
+                elif n_camera == 5:
+                    ori_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
+                else:
+                    raise NotImplementedError
+
                 _ori_image = cv2.resize(ori_image, (self._config.camera_width, self._config.camera_height))
                 res['ori_teacher'].append(self.teacher_ori_augmentation(_ori_image))
                 student_ori_img = self.student_ori_augmentation(_ori_image)
-
                 res['ori'].append(student_ori_img)
 
-                # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-                #     import pdb; pdb.set_trace()
-                stitched_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
+                if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+                    import pdb; pdb.set_trace()
+                if n_camera < 5:
+                    stitched_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
+                else:
+                    stitched_image = np.concatenate([b0_left, l2, l1, l0, f0, r0, r1, r2, b0_right], axis=1)
                 
-                img_w = l0.shape[1] + f0.shape[1] + r0.shape[1]
+                img_3cam_w = l0.shape[1] + f0.shape[1] + r0.shape[1]
                 l1_w = l1.shape[1]
                 r1_w = r1.shape[1]
                 whole_w = stitched_image.shape[1]
-                half_view_w = img_w + l1_w // 2 + r1_w // 2
+                half_view_w = img_3cam_w + l1_w // 2 + r1_w // 2
                 if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
                     debug_dir = 'debug_viz'
                     os.makedirs(debug_dir, exist_ok=True)
-                    _s_img = Image.fromarray(stitched_image[:, int(whole_w/2-half_view_w/2):int(whole_w/2+half_view_w/2)])
-                    _s_img.save(f'stitched_image.jpg')
+                    _s_img = Image.fromarray(stitched_image)
+                    _s_img.save(f'{debug_dir}/stitched_image.jpg')
+
+                if n_camera == 1:
+                    img_w = f0.shape[1]
+                elif n_camera == 3:
+                    img_w = img_3cam_w
+                elif n_camera == 5:
+                    img_w = img_3cam_w + l1_w + r1_w
+                else:
+                    raise NotImplementedError
 
                 for i in range(rotation_num):
                     _ego_rotation_angle_degree = self.aug_info[initial_token][i]['rot']

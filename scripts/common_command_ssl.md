@@ -12,8 +12,19 @@ python navsim/planning/script/run_metric_caching.py train_test_split=navtest \
 python navsim/planning/script/run_metric_caching.py train_test_split=warmup_two_stage \
     worker.threads_per_node=192 \
     metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/warmup_two_stage \
+    synthetic_sensor_path=$OPENSCENE_DATA_ROOT/warmup_two_stage/sensor_blobs \
+    synthetic_scenes_path=$OPENSCENE_DATA_ROOT/warmup_two_stage/synthetic_scene_pickles \
     --config-name default_metric_caching
 ```
+
+### 0-3. metric caching (navhard_two_stage)
+```bash
+python navsim/planning/script/run_metric_caching.py train_test_split=navhard_two_stage \
+    worker.threads_per_node=192 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/navhard_two_stage \
+    --config-name default_metric_caching
+```
+
 
 ### 1. ori
 ```bash
@@ -398,6 +409,8 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.refinement.num_refinement_stage=2 \
     agent.config.refinement.stage_layers=3+3 \
     agent.config.refinement.topks=128+64 \
+    agent.config.lab.use_cosine_ema_scheduler=true \
+    agent.config.lab.ema_momentum_start=0.99 \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null

@@ -12,17 +12,17 @@ padded_epoch=$(printf "%02d" $epoch)
 # Calculate step from epoch (1330 steps per epoch)
 step=$((($epoch + 1) * 1330))
 
-metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
+metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/navhard_two_stage"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep-one_stage"
+    experiment_name="${dir}/test-${padded_epoch}ep-navhard_two_stage"
 else
-    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-one_stage"
+    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-navhard_two_stage"
 fi
 
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
+python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     +debug=false \
     +use_pdm_closed=false \
     agent=hydra_img_vit_ssl \
@@ -36,7 +36,9 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
-    train_test_split=navtest \
+    train_test_split=navhard_two_stage \
+    synthetic_sensor_path=$OPENSCENE_DATA_ROOT/navhard_two_stage/sensor_blobs \
+    synthetic_scenes_path=$OPENSCENE_DATA_ROOT/navhard_two_stage/synthetic_scene_pickles
 "
 
 echo "--- COMMAND ---"
@@ -48,6 +50,6 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/evaluation/lab/eval_vit-single_stage.sh \
+bash scripts/ssl/evaluation/lab/eval_vit-single_stage-navhard_two_stage.sh \
     5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/single_stage
 '

@@ -77,7 +77,7 @@ class HydraBackbonePE(nn.Module):
         elif config.backbone_type == 'sptr':
             """
             usage in config:
-            
+
             camera_width: 2048
             camera_height: 512
             img_vert_anchors: 16
@@ -85,7 +85,7 @@ class HydraBackbonePE(nn.Module):
             backbone_type: 'sptr'
             lr_mult_backbone: 0.1
             sptr_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/sptr_vit.pth
-            
+
             # link for sptr_vit.pth: 
             wget https://github.com/exiawsh/storage/releases/download/v1.0/repdetr3d_eva02_800_bs2_seq_24e.pth
             mv repdetr3d_eva02_800_bs2_seq_24e.pth sptr_vit.pth
@@ -115,11 +115,16 @@ class HydraBackbonePE(nn.Module):
             )
             self.image_encoder.init_weights(config.sptr_ckpt)
             vit_channels = 1024
-        elif config.backbone_type == 'resnet':
+        elif config.backbone_type == 'resnet34':
             self.image_encoder = timm.create_model(
                 'resnet34', pretrained=False, features_only=True
             )
             vit_channels = 512
+        elif config.backbone_type == 'resnet50':
+            self.image_encoder = timm.create_model(
+                'resnet50', pretrained=False, features_only=True
+            )
+            vit_channels = 2048
         else:
             raise ValueError
 
@@ -147,7 +152,17 @@ class HydraBackbonePE(nn.Module):
         return self.avgpool_img(image_features)
 
     def forward_tup(self, image, **kwargs):
-        image_feat_tup = self.image_encoder(image, **kwargs)[-1]
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb;
+            pdb.set_trace()
+
+        if isinstance(self.image_encoder, DAViT):
+            image_feat_tup = self.image_encoder(image, **kwargs)[-1]
+        else:
+            image_feat = self.image_encoder(image)[-1]
+            class_feat = image_feat.mean(dim=(-1, -2))
+            image_feat_tup = (image_feat, class_feat)
+
         if self.config.lab.use_higher_res_feat_in_refinement:
             return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1], image_feat_tup[0])
         else:

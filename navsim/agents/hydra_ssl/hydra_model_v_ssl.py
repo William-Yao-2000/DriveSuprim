@@ -22,11 +22,11 @@ class HydraModel(nn.Module):
         ]
 
         self._config = config
-        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet', 'eva', 'moe', 'moe_ult32', 'swin']
+        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet34', 'resnet50', 'eva', 'moe', 'moe_ult32', 'swin']
         if config.backbone_type == 'eva':
             raise ValueError(f'{config.backbone_type} not supported')
         elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or \
-            config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type == 'resnet':
+            config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type in ('resnet34', 'resnet50'):
             self._backbone = HydraBackbonePE(config)
 
         img_num = 2 if config.use_back_view else 1
@@ -290,8 +290,8 @@ class HydraTrajHead(nn.Module):
         else:
             embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
         dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
@@ -521,8 +521,8 @@ class TrajOffsetHead(nn.Module):
         # status_encoding: bs, topk, c
         # coarse_scores: dict
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         B = bev_feat_fg.shape[0]
         

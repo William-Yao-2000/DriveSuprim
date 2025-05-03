@@ -106,6 +106,7 @@ class LabConfig:
     num_top_k: int = 64
     test_full_vocab_pdm_score_path: str = "???"
     use_first_stage_traj_in_infer: bool = False
+
     change_loss_weight: bool = False
     use_imi_learning_in_refinement: bool = True
     adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
@@ -114,6 +115,9 @@ class LabConfig:
     optimize_prev_frame_traj_for_ec: bool = False
     refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
     use_higher_res_feat_in_refinement: bool = False
+
+    use_cosine_ema_scheduler: bool = False
+    ema_momentum_start: float = 0.99
 
 
 @dataclass
@@ -195,6 +199,8 @@ class HydraConfigSSL(TransfuserConfig):
 
     # new
     lidar_seq_len: int = 1
+
+    n_camera: int = 3  # 1 or 3 or 5
 
     camera_width: int = 2048
     camera_height: int = 512

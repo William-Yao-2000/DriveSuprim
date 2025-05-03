@@ -18,6 +18,7 @@ from navsim.agents.hydra_plus.hydra_features import state2traj
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
 from navsim.agents.hydra_ssl.hydra_agent_ssl import HydraAgentSSL
+from navsim.agents.hydra_ssl.utils.util import CosineScheduler
 from navsim.common.dataclasses import Trajectory
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
 
@@ -47,6 +48,10 @@ class AgentLightningModuleSSL(pl.LightningModule):
 
         self.only_ori_input = cfg.only_ori_input
         self.n_rotation_crop = cfg.student_rotation_ensemble
+
+        if self._cfg.lab.use_cosine_ema_scheduler:
+            self.momentum_schedule = CosineScheduler(self._cfg.lab.ema_momentum_start, 0.999, 10)
+
 
     def _step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], logging_prefix: str) -> Tensor:
         """
@@ -154,10 +159,13 @@ class AgentLightningModuleSSL(pl.LightningModule):
         optimizer.step(closure=optimizer_closure)
         if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
             import pdb; pdb.set_trace()
-        if epoch < 3:
-            m = 0.992 + epoch * 0.002
+        if self._cfg.lab.use_cosine_ema_scheduler:
+            m = self.momentum_schedule[epoch]
         else:
-            m = 0.998
+            if epoch < 3:
+                m = 0.992 + epoch * 0.002
+            else:
+                m = 0.998
         self.agent.model.update_teacher(m)
     
 

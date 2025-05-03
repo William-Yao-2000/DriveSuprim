@@ -24,18 +24,16 @@ config:
 
   normalize_vocab_pos: True
 
-  n_camera: 3
+  camera_width: 2048
+  camera_height: 512
+  img_vert_anchors: 16
+  img_horz_anchors: 64
 
-  camera_width: 1024
-  camera_height: 256
-  img_vert_anchors: 8
-  img_horz_anchors: 32
-
-  backbone_type: 'vit'
+  backbone_type: 'resnet50'
   vit_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/da_vitl16.pth
   intern_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/intern_object365.pth
   vov_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/dd3d_det_final.pth
-  lr_mult_backbone: 0.1
+  lr_mult_backbone: 1.0
 
   trajectory_sampling:
     _target_: nuplan.planning.simulation.trajectory.trajectory_sampling.TrajectorySampling
