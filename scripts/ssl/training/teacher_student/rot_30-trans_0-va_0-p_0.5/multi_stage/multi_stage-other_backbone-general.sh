@@ -12,7 +12,7 @@ num_refinement_stage=$2
 stage_layers=$3
 topks=$4
 
-dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/stage_layers_$stage_layers-topks_$topks
+dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/stage_layers_$stage_layers-topks_$topks-$agent
 
 
 command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
@@ -51,5 +51,5 @@ eval $command_string
 : '
 usage:
 bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone-general.sh \
-  hydra_img_r34_ssl 1 3 256
+  hydra_img_vov_ssl 1 3 256
 '
