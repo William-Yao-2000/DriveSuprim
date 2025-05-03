@@ -7,9 +7,11 @@ import hydra
 import pytorch_lightning as pl
 from hydra.utils import instantiate
 from omegaconf import DictConfig
+from pytorch_lightning.strategies import DDPStrategy
 from torch.utils.data import DataLoader
 
 from navsim.agents.abstract_agent import AbstractAgent
+from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
 from navsim.common.dataclasses import SceneFilter
 from navsim.common.dataloader import SceneLoader
 from navsim.planning.training.agent_lightning_module import AgentLightningModule
@@ -31,7 +33,9 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[Dataset, Data
     train_scene_filter: SceneFilter = instantiate(cfg.train_test_split.scene_filter)
     if train_scene_filter.log_names is not None:
         train_scene_filter.log_names = [
-            log_name for log_name in train_scene_filter.log_names if log_name in cfg.train_logs
+            log_name
+            for log_name in train_scene_filter.log_names
+            if log_name in cfg.train_logs
         ]
     else:
         train_scene_filter.log_names = cfg.train_logs
@@ -44,7 +48,6 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[Dataset, Data
 
     data_path = Path(cfg.navsim_log_path)
     original_sensor_path = Path(cfg.original_sensor_path)
-
     train_scene_loader = SceneLoader(
         original_sensor_path=original_sensor_path,
         data_path=data_path,
@@ -93,6 +96,9 @@ def main(cfg: DictConfig) -> None:
     logger.info("Building Agent")
     agent: AbstractAgent = instantiate(cfg.agent)
 
+    if agent._checkpoint_path is not None:
+        agent.initialize()
+
     logger.info("Building Lightning Module")
     lightning_module = AgentLightningModule(
         agent=agent,
@@ -104,7 +110,7 @@ def main(cfg: DictConfig) -> None:
             not cfg.force_cache_computation
         ), "force_cache_computation must be False when using cached data without building SceneLoader"
         assert (
-            cfg.cache_path is not None
+                cfg.cache_path is not None
         ), "cache_path must be provided when using cached data without building SceneLoader"
         train_data = CacheOnlyDataset(
             cache_path=cfg.cache_path,
@@ -129,13 +135,21 @@ def main(cfg: DictConfig) -> None:
     logger.info("Num validation samples: %d", len(val_data))
 
     logger.info("Building Trainer")
-    trainer = pl.Trainer(**cfg.trainer.params, callbacks=agent.get_training_callbacks())
+    if isinstance(agent, TransfuserAgent):
+        trainer = pl.Trainer(**cfg.trainer.params,
+                             callbacks=agent.get_training_callbacks())
+    else:
+        trainer = pl.Trainer(**cfg.trainer.params,
+                             callbacks=agent.get_training_callbacks(),
+                             strategy=DDPStrategy(static_graph=True,
+                                                  timeout=datetime.timedelta(seconds=3600)))
 
     logger.info("Starting Training")
     trainer.fit(
         model=lightning_module,
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader,
+        ckpt_path=cfg.get('resume_ckpt_path', None)
     )
 
 
