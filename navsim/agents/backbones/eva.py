@@ -1,20 +1,18 @@
+import logging
+import math
 import os
+import warnings
 from collections import OrderedDict
-from mmcv.runner import _load_checkpoint
+from functools import partial
+from math import pi
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-import numpy as np
-import logging
-from functools import partial
-from scipy import interpolate
-from math import pi
-from einops import rearrange, repeat
-import warnings
 import torch.utils.checkpoint as cp
-from mmdet.models.builder import BACKBONES
+from einops import rearrange, repeat
+from scipy import interpolate
 
 logger = logging.getLogger(__name__)
 BatchNorm2d = torch.nn.BatchNorm2d
@@ -31,6 +29,7 @@ try:
 except ImportError:
     XFORMERS_AVAILABLE = False
     warnings.warn("xFormers is not available (Attention)")
+
 
 class Conv2d(torch.nn.Conv2d):
     """
@@ -874,7 +873,6 @@ class Block(nn.Module):
         return x
 
 
-@BACKBONES.register_module()
 class EVAViT(nn.Module):
     """
     This module implements Vision Transformer (ViT) backbone in :paper:`vitdet`.
@@ -1010,9 +1008,7 @@ class EVAViT(nn.Module):
                 m.requires_grad = False
 
     def init_weights(self, ckpt_path):
-        ckpt = _load_checkpoint(ckpt_path,
-                                logger=logger,
-                                map_location='cpu')
+        ckpt = torch.load(ckpt_path, map_location='cpu')
         if 'state_dict' in ckpt:
             _state_dict = ckpt['state_dict']
         elif 'model' in ckpt:
@@ -1044,7 +1040,7 @@ class EVAViT(nn.Module):
         meg = self.load_state_dict(state_dict, False)
         print(meg)
 
-    def forward(self, x,):
+    def forward(self, x, ):
         x = self.patch_embed(x)
         if self.pos_embed is not None:
             x = x + get_abs_pos(
