@@ -201,33 +201,14 @@ class HydraTargetBuilder(AbstractTargetBuilder):
             TrajectorySampling(num_poses=40, interval_length=0.1),
             ego_state.time_point
         )
-        command_states = self.simulator.simulate_command_states(
-            interpolated_traj[None],
-            ego_state
-        )
-        # print(command_states.max().item(), command_states.min().item())
-        # [40, 2]
-
-        recovered_states = self.simulator.command_states2waypoints(
-            command_states, ego_state
-        )
-
         final_traj = state2traj(interpolated_traj)
         final_traj = torch.tensor(final_traj)
-
-        recovered_traj = state2traj(recovered_states.squeeze(0))
-        recovered_traj = torch.tensor(recovered_traj)
-
-        # print((final_traj-recovered_traj).abs().max())
-        command_states = torch.tensor(command_states)
-
         return {
             "trajectory": trajectory,
             "agent_states": agent_states,
             "agent_labels": agent_labels,
             "bev_semantic_map": bev_semantic_map,
             "interpolated_traj": final_traj,
-            "command_states": command_states
         }
 
     def _compute_agent_targets(self, annotations: Annotations) -> Tuple[torch.Tensor, torch.Tensor]:
