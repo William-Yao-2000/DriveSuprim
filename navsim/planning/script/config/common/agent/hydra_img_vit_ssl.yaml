@@ -24,6 +24,8 @@ config:
 
   normalize_vocab_pos: True
 
+  n_camera: 3
+
   camera_width: 1024
   camera_height: 256
   img_vert_anchors: 8

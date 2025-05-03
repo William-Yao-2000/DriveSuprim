@@ -200,6 +200,8 @@ class HydraConfigSSL(TransfuserConfig):
     # new
     lidar_seq_len: int = 1
 
+    n_camera: int = 3  # 1 or 3 or 5
+
     camera_width: int = 2048
     camera_height: int = 512
     lidar_resolution_width: int = 256
