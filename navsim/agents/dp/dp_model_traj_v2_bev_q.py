@@ -12,12 +12,7 @@ class DPModel_traj_v2_bev_q(nn.Module):
     def __init__(self, config: DPConfig):
         super().__init__()
         self._config = config
-        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet', 'eva', 'moe', 'moe_ult32', 'swin']
-        if config.backbone_type == 'eva':
-            raise ValueError(f'{config.backbone_type} not supported')
-        elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or \
-                config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type == 'resnet':
-            self._backbone = HydraBackboneBEVQ(config)
+        self._backbone = HydraBackboneBEVQ(config)
 
         kv_len = self._backbone.bev_w * self._backbone.bev_h
         self._keyval_embedding = nn.Embedding(
