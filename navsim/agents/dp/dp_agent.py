@@ -53,12 +53,7 @@ def dp_loss_bev(
 ):
     # B, 8 (4 secs, 0.5Hz), 3
     target_traj = targets["trajectory"]
-    command_states = targets["command_states"]
-    if 'traj' in config.version:
-        dp_loss = traj_head.get_dp_loss(predictions['env_kv'], target_traj.float())
-    else:
-        dp_loss = traj_head.get_dp_loss(predictions['env_kv'], command_states.float())
-
+    dp_loss = traj_head.get_dp_loss(predictions['env_kv'], target_traj.float())
     bev_semantic_loss = F.cross_entropy(predictions["bev_semantic_map"], targets["bev_semantic_map"].long())
 
     dp_loss = dp_loss * 10.0
