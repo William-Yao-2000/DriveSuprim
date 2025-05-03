@@ -6,11 +6,16 @@ import timm
 import torch
 from torch import nn
 
-from navsim.agents.backbones.eva import EVAViT
-from navsim.agents.backbones.internimage import InternImage
-from navsim.agents.backbones.swin import SwinTransformerBEVFT
-from navsim.agents.backbones.vov import VoVNet
 from navsim.agents.hydra_plus.hydra_config import HydraConfig
+
+from navsim.agents.backbones.eva import EVAViT
+try:
+    from navsim.agents.backbones.internimage import InternImage
+    from navsim.agents.backbones.swin import SwinTransformerBEVFT
+    from navsim.agents.backbones.vov import VoVNet
+except:
+    print('mmcv not supported')
+
 from navsim.agents.utils.vit import DAViT
 
 
