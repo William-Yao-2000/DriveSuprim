@@ -5,7 +5,7 @@ Implements the TransFuser vision backbone.
 import timm
 import torch
 from torch import nn
-
+import torch.nn.functional as F
 from navsim.agents.backbones.eva import EVAViT
 try:
     from navsim.agents.backbones.internimage import InternImage
@@ -187,13 +187,21 @@ class HydraBackboneBEVQ(nn.Module):
         img_tokens = self.avgpool_img(image_features)
         return img_tokens.flatten(-2, -1).permute(0, 2, 1)
 
+    def encode_img_single(self, img):
+        img_features = self.image_encoder(img)[-1]
+        B, C, H, W = img_features.shape
+
+        img_tokens = F.adaptive_avg_pool2d(img_features, output_size=(H // 2, W // 2))
+        return img_tokens.flatten(-2, -1).permute(0, 2, 1)
+
+
     def forward(self, image_front, image_back, image_left, image_right):
         B = image_front.shape[0]
 
         image_features_front = self.encode_img(image_front)
         image_features_back = self.encode_img(image_back)
-        image_features_left = self.encode_img(image_left)
-        image_features_right = self.encode_img(image_right)
+        image_features_left = self.encode_img_single(image_left)
+        image_features_right = self.encode_img_single(image_right)
 
         img_tokens = torch.cat([image_features_front, image_features_back, image_features_left, image_features_right], 1)
         bev_tokens = self.bev_queries.weight[None].repeat(B, 1, 1)
