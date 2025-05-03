@@ -70,6 +70,31 @@ class HydraBackboneBEVQ(nn.Module):
                 output_missing_index_as_none=False
             )
             vit_channels = 1536
+        elif config.backbone_type == 'sptr':
+            img_vit_size = (config.camera_height, config.camera_width)
+            self.image_encoder = EVAViT(
+                img_size=img_vit_size[0],  # img_size for short side
+                patch_size=16,
+                window_size=16,
+                global_window_size=img_vit_size[0] // 16,
+                # If use square image (e.g., set global_window_size=0, else global_window_size=img_size // 16)
+                in_chans=3,
+                embed_dim=1024,
+                depth=24,
+                num_heads=16,
+                mlp_ratio=4 * 2 / 3,
+                window_block_indexes=(
+                        list(range(0, 2)) + list(range(3, 5)) + list(range(6, 8)) + list(range(9, 11)) + list(
+                    range(12, 14)) + list(range(15, 17)) + list(range(18, 20)) + list(range(21, 23))
+                ),
+                qkv_bias=True,
+                drop_path_rate=0.3,
+                with_cp=True,
+                flash_attn=False,
+                xformers_attn=True
+            )
+            self.image_encoder.init_weights(config.sptr_ckpt)
+            vit_channels = 1024
         elif config.backbone_type == 'vit':
             self.image_encoder = DAViT(ckpt=config.vit_ckpt)
             vit_channels = 1024
@@ -145,8 +170,22 @@ class HydraBackboneBEVQ(nn.Module):
         return p3
 
     def encode_img(self, img):
-        image_features = self.image_encoder(img)[-1]
-        return image_features.flatten(-2, -1).permute(0, 2, 1)
+        B, C, H, W = img.shape
+        if self.backbone_type == 'vov':
+            image_features = self.image_encoder(img)[-1]
+        elif self.backbone_type == 'sptr':
+            half_w = W // 2
+            image_left = img[..., :half_w]
+            image_right = img[..., half_w:]
+            image_features_left = self.image_encoder(image_left)[-1]
+            image_features_right = self.image_encoder(image_right)[-1]
+            image_features = torch.cat([
+                image_features_left, image_features_right
+            ], -1)
+        else:
+            raise ValueError('Forward wrong backbone')
+        img_tokens = self.avgpool_img(image_features)
+        return img_tokens.flatten(-2, -1).permute(0, 2, 1)
 
     def forward(self, image_front, image_back, image_left, image_right):
         B = image_front.shape[0]
