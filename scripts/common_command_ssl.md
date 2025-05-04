@@ -196,6 +196,34 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_v1.py \
 ```
 
 
+### 3. submission
+#### 3-1. warmup_two_stage
+
+debug
+```bash
+TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_create_submission_pickle_warmup.py \
+    train_test_split=warmup_two_stage \
+    agent=hydra_img_vit_ssl_v1 \
+    dataloader.params.batch_size=8 \
+    agent.config.training=false \
+    agent.config.only_ori_input=true \
+    agent.config.inference.model=teacher \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    experiment_name=debug_submission \
+    team_name=aa \
+    authors=yywwhh \
+    email=cc \
+    institution=fdu \
+    country=chn \
+    synthetic_sensor_path=$OPENSCENE_DATA_ROOT/warmup_two_stage/sensor_blobs \
+    synthetic_scenes_path=$OPENSCENE_DATA_ROOT/warmup_two_stage/synthetic_scene_pickles
+```
+
 
 ## 2. training
 ### 0. generate offline augmentation file
@@ -409,8 +437,6 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.refinement.num_refinement_stage=2 \
     agent.config.refinement.stage_layers=3+3 \
     agent.config.refinement.topks=128+64 \
-    agent.config.lab.use_cosine_ema_scheduler=true \
-    agent.config.lab.ema_momentum_start=0.99 \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null
