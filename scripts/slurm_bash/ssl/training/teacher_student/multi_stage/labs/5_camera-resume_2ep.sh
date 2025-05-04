@@ -28,7 +28,7 @@ done
 
 : '
 usage:
-bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs/5_camera.sh \
+bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs/5_camera-resume_2ep.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/5_camera-resume.sh \
     interactive
 '
