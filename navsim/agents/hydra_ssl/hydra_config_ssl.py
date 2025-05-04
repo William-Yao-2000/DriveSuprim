@@ -96,7 +96,8 @@ class RefinementConfig:
     topks: str = "256+16"
 
     use_mid_output: bool = True
-    use_offset_refinement: bool = True
+    use_offset_refinement: bool = True  # abandoned
+    use_offset_refinement_v2: bool = False
     use_separate_stage_heads: bool = True
 
 

@@ -123,7 +123,8 @@ config:
     stage_layers: "3+3"
     topks: "256+16"
     use_mid_output: true
-    use_offset_refinement: true
+    use_offset_refinement: false
+    use_offset_refinement_v2: false
     use_separate_stage_heads: true
   
   inference:
