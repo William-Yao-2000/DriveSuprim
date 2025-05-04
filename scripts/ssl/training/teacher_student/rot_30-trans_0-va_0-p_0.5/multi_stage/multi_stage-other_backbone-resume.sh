@@ -15,10 +15,25 @@ topks=$4
 dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/stage_layers_$stage_layers-topks_$topks-$agent
 
 
+ckpt_epoch=$5
+# Format epoch with leading zero
+padded_ckpt_epoch=$(printf "%02d" $ckpt_epoch)
+
+# Calculate step from epoch (1330 steps per epoch)
+step=$((($ckpt_epoch + 1) * 1330))
+
+resume="epoch\=${padded_ckpt_epoch}-step\=${step}.ckpt"
+
+if [ -z "$resume" ]; then
+    echo -e "Wrong! You need to provide the resume model name!"
+    exit 1
+fi
+
 command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=false \
     agent=$agent \
     experiment_name=$dir \
+    +resume_ckpt_path='$NAVSIM_EXP_ROOT/$dir/$resume' \
     split=trainval \
     train_test_split=navtrain \
     dataloader.params.batch_size=$bs \
@@ -50,6 +65,6 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone-general.sh \
-  hydra_img_vov_ssl 1 3 256
+bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone-resume.sh \
+  hydra_img_r50_ssl 1 3 256 2
 '
