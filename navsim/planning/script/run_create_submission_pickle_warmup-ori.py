@@ -5,12 +5,6 @@ import traceback
 from pathlib import Path
 from typing import Dict
 
-import torch
-import torch.distributed as dist
-from torch.utils.data import DataLoader
-
-import pytorch_lightning as pl
-
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
@@ -19,8 +13,6 @@ from tqdm import tqdm
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.common.dataclasses import SceneFilter, Trajectory
 from navsim.common.dataloader import SceneLoader
-from navsim.planning.training.agent_lightning_module_ssl import AgentLightningModuleSSL
-from navsim.planning.training.dataset_ssl import DatasetSSL as Dataset
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +28,6 @@ def run_test_evaluation(
     synthetic_sensor_path: Path,
     original_sensor_path: Path,
     synthetic_scenes_path: Path,
-    merged_predictions,
 ) -> Dict[str, Trajectory]:
     """
     Function to create the output file for evaluation of an agent on the testserver
@@ -60,15 +51,16 @@ def run_test_evaluation(
         synthetic_sensor_path=synthetic_sensor_path,
         original_sensor_path=original_sensor_path,
         synthetic_scenes_path=synthetic_scenes_path,
+        sensor_config=agent.get_sensor_config(),
     )
-
-    model_trajectory = merged_predictions
+    agent.initialize()
 
     # first stage output
     first_stage_output: Dict[str, Trajectory] = {}
     for token in tqdm(input_loader.tokens_stage_one, desc="Running first stage evaluation"):
         try:
-            trajectory = model_trajectory[token]['trajectory']
+            agent_input = input_loader.get_agent_input_from_token(token)
+            trajectory = agent.compute_trajectory(agent_input)
             first_stage_output.update({token: trajectory})
         except Exception:
             logger.warning(f"----------- Agent failed for token {token}:")
@@ -81,7 +73,8 @@ def run_test_evaluation(
     second_stage_output: Dict[str, Trajectory] = {}
     for token in tqdm(scene_loader_tokens_stage_two, desc="Running second stage evaluation"):
         try:
-            trajectory = model_trajectory[token]['trajectory']
+            agent_input = input_loader.get_agent_input_from_token(token)
+            trajectory = agent.compute_trajectory(agent_input)
             second_stage_output.update({token: trajectory})
         except Exception:
             logger.warning(f"----------- Agent failed for token {token}:")
@@ -97,57 +90,12 @@ def main(cfg: DictConfig) -> None:
     :param cfg: omegaconf dictionary
     """
     agent = instantiate(cfg.agent)
-    agent.initialize()
-
     data_path = Path(cfg.navsim_log_path)
     synthetic_sensor_path = Path(cfg.synthetic_sensor_path)
     original_sensor_path = Path(cfg.original_sensor_path)
     synthetic_scenes_path = Path(cfg.synthetic_scenes_path)
     save_path = Path(cfg.output_dir)
     scene_filter = instantiate(cfg.train_test_split.scene_filter)
-
-    scene_loader_inference = SceneLoader(
-        synthetic_sensor_path=Path(cfg.synthetic_sensor_path),
-        original_sensor_path=Path(cfg.original_sensor_path),
-        data_path=Path(cfg.navsim_log_path),
-        synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
-        scene_filter=scene_filter,
-        sensor_config=agent.get_sensor_config(),
-    )
-    dataset = Dataset(
-        scene_loader=scene_loader_inference,
-        feature_builders=agent.get_feature_builders(),
-        target_builders=agent.get_target_builders(),
-        cfg=cfg.agent.config,
-        cache_path=None,
-        force_cache_computation=False,
-        append_token_to_batch=True
-    )
-    dataloader = DataLoader(dataset, **cfg.dataloader.params, shuffle=False)
-
-    trainer = pl.Trainer(**cfg.trainer.params, callbacks=agent.get_training_callbacks())
-    predictions = trainer.predict(
-        AgentLightningModuleSSL(
-            cfg=cfg.agent.config,
-            agent=agent,
-        ),
-        dataloader,
-        return_predictions=True
-    )
-    dist.barrier()
-    all_predictions = [None for _ in range(dist.get_world_size())]
-
-    if dist.is_initialized():
-        dist.all_gather_object(all_predictions, predictions)
-    else:
-        all_predictions.append(predictions)
-
-    merged_predictions = {}
-    for proc_prediction in all_predictions:
-        for d in proc_prediction:
-            merged_predictions.update(d)
-
-    # import pdb; pdb.set_trace()
 
     first_stage_output, second_stage_output = run_test_evaluation(
         cfg=cfg,
@@ -157,7 +105,6 @@ def main(cfg: DictConfig) -> None:
         synthetic_scenes_path=synthetic_scenes_path,
         synthetic_sensor_path=synthetic_sensor_path,
         original_sensor_path=original_sensor_path,
-        merged_predictions=merged_predictions
     )
 
     submission = {

@@ -204,8 +204,9 @@ debug
 TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
 python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_create_submission_pickle_warmup.py \
     train_test_split=warmup_two_stage \
-    agent=hydra_img_vit_ssl_v1 \
+    agent=hydra_img_vit_ssl \
     dataloader.params.batch_size=8 \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
     agent.config.training=false \
     agent.config.only_ori_input=true \
     agent.config.inference.model=teacher \
@@ -213,11 +214,12 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_create_submission_pickle_w
     agent.config.refinement.num_refinement_stage=1 \
     agent.config.refinement.stage_layers=3 \
     agent.config.refinement.topks=256 \
-    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    agent.config.lab.use_first_stage_traj_in_infer=true \
     experiment_name=debug_submission \
-    team_name=aa \
-    authors=yywwhh \
-    email=cc \
+    train_test_split=warmup_two_stage \
+    team_name=ntestv_1 \
+    authors=why \
+    email=whyao23@m.fudan.edu.cn \
     institution=fdu \
     country=chn \
     synthetic_sensor_path=$OPENSCENE_DATA_ROOT/warmup_two_stage/sensor_blobs \
