@@ -1,21 +1,27 @@
+agent="hydra_img_vit_ssl"
 bs=8
 lr=0.000075
-epoch=16
+epoch=8
 config="competition_training"
 rot=30
 trans=0
 va=0
 probability=0.5
 
-agent=$1
-num_refinement_stage=$2
-stage_layers=$3
-topks=$4
+num_refinement_stage=1
+stage_layers=3
+topks=256
 
-dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/stage_layers_$stage_layers-topks_$topks-$agent
+use_imi_learning_in_refinement=false
+
+dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs/stage_layers_$stage_layers-topks_$topks-higher_img_resolution
+
+if [ "$use_imi_learning_in_refinement" = "false" ]; then
+    dir="$dir-not_use_imi_learning_in_refinement"
+fi
 
 
-ckpt_epoch=$5
+ckpt_epoch=$1
 # Format epoch with leading zero
 padded_ckpt_epoch=$(printf "%02d" $ckpt_epoch)
 
@@ -42,6 +48,10 @@ command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_s
     trainer.params.limit_val_batches=0.05 \
     agent.config.ckpt_path=$dir \
     agent.lr=$lr \
+    agent.config.camera_width=2048 \
+    agent.config.camera_height=512 \
+    agent.config.img_vert_anchors=16 \
+    agent.config.img_horz_anchors=64 \
     agent.config.ego_perturb.mode=load_from_offline \
     agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_$rot-trans_$trans-va_$va-p_$probability-ensemble.json \
     agent.config.ego_perturb.rotation.enable=true \
@@ -51,6 +61,7 @@ command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_s
     agent.config.refinement.num_refinement_stage=$num_refinement_stage \
     agent.config.refinement.stage_layers=$stage_layers \
     agent.config.refinement.topks=$topks \
+    agent.config.lab.use_imi_learning_in_refinement=$use_imi_learning_in_refinement \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_final/navtrain.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_$rot-trans_$trans-va_$va-p_$probability-ensemble/split_pickles \
     cache_path=null
@@ -61,10 +72,3 @@ echo $command_string
 echo "\n\n"
 
 eval $command_string
-
-
-: '
-usage:
-bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone-resume.sh \
-  hydra_img_vov_ssl 1 3 256 7
-'
