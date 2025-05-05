@@ -62,3 +62,12 @@ echo $command_string
 echo -e "\n\n"
 
 eval $command_string
+
+
+
+: '
+usage:
+bash scripts/ssl/evaluation/lab/eval_vit-multi_stage-higher_img_resolution-navhard_two_stage.sh \
+  4 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-higher_img_resolution \
+  1 3 256 true
+'
