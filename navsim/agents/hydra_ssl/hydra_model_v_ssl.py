@@ -301,7 +301,7 @@ class HydraTrajHead(nn.Module):
             # zxli: combined inference with dp
             curr_dp_preds = []
             for token in tokens:
-                curr_dp_preds.append(self.dp_preds[token]['interpolated_proposal'][None])
+                curr_dp_preds.append(torch.from_numpy(self.dp_preds[token]['interpolated_proposal']).float().to(bev_feature.device)[None])
             # B, N, 40, 3
             curr_dp_preds = torch.cat(curr_dp_preds, 0)
             NUM_PROPOSALS = curr_dp_preds.shape[1]
