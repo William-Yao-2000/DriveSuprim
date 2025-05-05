@@ -344,6 +344,10 @@ class HydraTrajHead(nn.Module):
         result["trajectory_vocab"] = self.vocab.data
         result["selected_indices"] = selected_indices
 
+        # zxli: return without second stage
+        if self.dp_preds is not None:
+            return result
+
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
