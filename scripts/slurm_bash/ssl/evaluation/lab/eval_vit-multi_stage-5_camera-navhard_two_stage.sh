@@ -29,7 +29,7 @@ submit_job \
     --gpu 8 \
     --tasks_per_node 8 \
     --nodes 1 \
-    -n "eval-navsim_ssl-$dir_name-${epoch}epoch" \
+    -n "eval-navsim_ssl-$dir_name-${epoch}epoch-navhard_two_stage" \
     --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
     --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/evaluation/ \
     --email_mode never \
