@@ -4,7 +4,7 @@ partition=$2
 
 dir_name=$(echo $bash_file | tr '/' '-' | tr '.' 'dot')
 
-for epoch in $(seq 1 2 5)
+for epoch in $(seq 3 2 5)
 do
     echo $epoch
     submit_job \
