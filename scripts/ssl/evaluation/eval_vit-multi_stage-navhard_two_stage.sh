@@ -6,7 +6,8 @@ dir=${2:-"training/ssl/ori/lr_baseline"}
 num_refinement_stage=$3
 stage_layers=$4
 topks=$5
-use_first_stage_traj_in_infer=${6:-"false"}
+agent=${6:-"hydra_img_vit_ssl"}
+use_first_stage_traj_in_infer=${7:-"false"}
 
 inference_model="teacher"
 
@@ -33,7 +34,7 @@ command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
 python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     +debug=false \
     +use_pdm_closed=false \
-    agent=hydra_img_vit_ssl \
+    agent=$agent \
     dataloader.params.batch_size=8 \
     worker.threads_per_node=128 \
     agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
