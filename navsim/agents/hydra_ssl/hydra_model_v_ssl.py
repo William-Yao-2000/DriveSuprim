@@ -341,6 +341,15 @@ class HydraTrajHead(nn.Module):
                    1.0 * result['history_comfort'].sigmoid()
                    ).log()
         )
+
+        # zxli: return without second stage
+        if self.dp_preds is not None:
+            scores = scores[:, L:]
+            selected_indices = scores.argmax(1)
+            scene_cnt_tensor = torch.arange(B, device=scores.device)
+            result["trajectory"] = dp_proposals[scene_cnt_tensor, selected_indices].view(B, HORIZON, 3)
+            return result
+
         if self._config.lab.optimize_prev_frame_traj_for_ec:
             scores += 0.008 * result['imi_prev'].softmax(-1).log()
         
@@ -348,10 +357,6 @@ class HydraTrajHead(nn.Module):
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
         result["selected_indices"] = selected_indices
-
-        # zxli: return without second stage
-        if self.dp_preds is not None:
-            return result
 
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
