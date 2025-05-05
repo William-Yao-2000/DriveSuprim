@@ -338,7 +338,7 @@ class HydraTrajHead(nn.Module):
             
             # Store the scores for each top-k trajectory
             _dict['coarse_score'] = {}
-            for score_key in self._config.trajectory_pdm_weight.keys():
+            for score_key in self.heads.keys():
                 _dict['coarse_score'][score_key] = result[score_key][batch_indices, topk_indices]
             result['refinement'].append(_dict)
 
@@ -372,7 +372,7 @@ class TrajOffsetHead(nn.Module):
         self.nlayers = sum(self.stage_layers)
 
         self.use_mid_output = config.refinement.use_mid_output
-        self.use_offset_refinement = config.refinement.use_offset_refinement
+        self.use_offset_refinement = config.refinement.use_offset_refinement_v2
         if self.use_offset_refinement:
             assert self.use_mid_output == True
         self.use_separate_stage_heads = config.refinement.use_separate_stage_heads
@@ -521,8 +521,8 @@ class TrajOffsetHead(nn.Module):
         # status_encoding: bs, topk, c
         # coarse_scores: dict
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         B = bev_feat_fg.shape[0]
         
@@ -535,22 +535,19 @@ class TrajOffsetHead(nn.Module):
             # Compute scores for each layer
             layer_results = []
             # Initialize reference scores from coarse_score
-            # reference = refinement_dict[-1]['coarse_score']
+            if self.use_offset_refinement:
+                reference = refinement_dict[-1]['coarse_score']
             for j, dist_status in enumerate(tr_out_lst):
                 layer_result = {}
                 for k, head in self.multi_stage_heads[i].items():
                     if self.use_offset_refinement:
-                        # Compute offset and apply to reference using inverse sigmoid
-                        # inverse_sigmoid(reference) + offset, then sigmoid
-                        # if k != 'imi':
-                        #     offset = head(dist_status).squeeze(-1)
-                        #     layer_result[k] = reference[k] + offset
-                        #     # Update reference for next layer
-                        #     reference[k] = layer_result[k]
-                        # else:
-                        layer_result[k] = head(dist_status).squeeze(-1)
+                        # Compute offset
+                        offset = head(dist_status).squeeze(-1)
+                        layer_result[k] = reference[k] + offset
+                        # Update reference for next layer
+                        reference[k] = layer_result[k]
                     else:
-                        layer_result[k] = torch.sigmoid(head(dist_status).squeeze(-1))
+                        layer_result[k] = head(dist_status).squeeze(-1)
                 layer_results.append(layer_result)
             
             if not self.use_mid_output:
@@ -606,9 +603,10 @@ class TrajOffsetHead(nn.Module):
                 _next_layer_dict["trajs"] = refinement_dict[-1]['trajs'][batch_indices, select_indices]
                 _next_layer_dict["trajs_status"] = tr_out_lst[-1][batch_indices, select_indices]
                 _next_layer_dict['indices_absolute'] = refinement_dict[-1]['indices_absolute'][batch_indices, select_indices]
-                # _next_layer_dict['coarse_score'] = {}
-                # for score_key in self._config.trajectory_pdm_weight.keys():
-                #     _next_layer_dict['coarse_score'][score_key] = last_layer_result[score_key][batch_indices, select_indices]
+                if self.use_offset_refinement:
+                    _next_layer_dict['coarse_score'] = {}
+                    for score_key in self.multi_stage_heads[0].keys():
+                        _next_layer_dict['coarse_score'][score_key] = last_layer_result[score_key][batch_indices, select_indices]
                 
                 refinement_dict.append(_next_layer_dict)
             

@@ -8,7 +8,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.checkpoint import checkpoint
-
 from navsim.agents.backbones.eva import EVAViT
 from navsim.agents.backbones.internimage import InternImage
 from navsim.agents.backbones.swin import SwinTransformerBEVFT
@@ -152,9 +151,8 @@ class HydraBackbonePE(nn.Module):
         return self.avgpool_img(image_features)
 
     def forward_tup(self, image, **kwargs):
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb;
-            pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         if isinstance(self.image_encoder, DAViT):
             image_feat_tup = self.image_encoder(image, **kwargs)[-1]
@@ -162,7 +160,7 @@ class HydraBackbonePE(nn.Module):
             image_feat = self.image_encoder(image)[-1]
             class_feat = image_feat.mean(dim=(-1, -2))
             image_feat_tup = (image_feat, class_feat)
-
+        
         if self.config.lab.use_higher_res_feat_in_refinement:
             return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1], image_feat_tup[0])
         else:

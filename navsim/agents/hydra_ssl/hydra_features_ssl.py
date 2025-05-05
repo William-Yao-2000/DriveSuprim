@@ -160,8 +160,8 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         cameras = agent_input.cameras[-seq_len:]  # List[Cameras]
         assert(len(cameras) == seq_len)
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         
         res['ori_teacher'] = []
         res['ori'] = []
@@ -197,8 +197,8 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
                 student_ori_img = self.student_ori_augmentation(_ori_image)
                 res['ori'].append(student_ori_img)
 
-                if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-                    import pdb; pdb.set_trace()
+                # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+                #     import pdb; pdb.set_trace()
                 if n_camera < 5:
                     stitched_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
                 else:
