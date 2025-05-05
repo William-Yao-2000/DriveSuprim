@@ -1,0 +1,56 @@
+_target_: navsim.agents.dp.dp_agent.DPAgent
+_convert_: 'all'
+pdm_gt_path: ???
+
+config:
+  _target_: navsim.agents.dp.dp_config.DPConfig
+  _convert_: 'all'
+  seq_len: 1
+  ckpt_path: dp_ckpt
+  lidar_seq_len: 4
+  sigma: 0.5
+  version: 'traj_v2_bev_q'
+  trajectory_imi_weight: 1.0
+  num_proposals: 100
+
+  use_back_view: True
+  use_lr_view: True
+  fusion_layers: 3
+# cycle is bad
+#  scheduler: cycle
+# 5layers > 4/6 layers
+  # dim=256 > dim=512
+# denoising steps 100 > 10 (DDPM)
+  # no temporal > temporal
+
+  progress_weight: 2.0
+
+  normalize_vocab_pos: True
+
+
+  camera_width: 2048
+  camera_height: 512
+  img_vert_anchors: 16
+  img_horz_anchors: 64
+  backbone_type: 'sptr'
+
+#  camera_width: 1024
+#  camera_height: 256
+#  img_vert_anchors: 8
+#  img_horz_anchors: 32
+#  backbone_type: 'resnet'
+
+  vit_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/da_vitl16.pth
+  intern_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/intern_object365.pth
+  vov_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/dd3d_det_final.pth
+  sptr_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/sptr_vit.pth
+  lr_mult_backbone: 0.1
+
+  trajectory_sampling:
+    _target_: nuplan.planning.simulation.trajectory.trajectory_sampling.TrajectorySampling
+    _convert_: 'all'
+    time_horizon: 4
+    interval_length: 0.5
+
+checkpoint_path: null
+lr: 1e-4

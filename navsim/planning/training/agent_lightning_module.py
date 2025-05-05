@@ -34,7 +34,10 @@ class AgentLightningModule(pl.LightningModule):
             TrajectorySampling(num_poses=40, interval_length=0.1)
         )
         self.v_params = get_pacifica_parameters()
-        self.hydra_preds = pickle.load(open(f'{os.getenv("NAVSIM_EXP_ROOT")}/hydra_plus_v2ep/epoch19.pkl', 'rb'))
+        try:
+            self.hydra_preds = pickle.load(open(f'{os.getenv("NAVSIM_EXP_ROOT")}/hydra_plus_v2ep/epoch19.pkl', 'rb'))
+        except:
+            print('hydra preds not found in agent lightning module')
         self.vocab = torch.from_numpy(
             np.load(f'{os.getenv("NAVSIM_DEVKIT_ROOT")}/traj_final/test_16384_rearaxle_kmeans.npy')
         )

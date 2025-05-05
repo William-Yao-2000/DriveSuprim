@@ -15,6 +15,14 @@ NAVSIM_DEVKIT_ROOT = os.environ.get("NAVSIM_DEVKIT_ROOT")
 class HydraConfig(TransfuserConfig):
     scheduler: str = 'default'
 
+    version: str = 'default'
+    use_temporal_bev_kv: bool = False
+
+    is_rl_training: bool = False
+
+    regression_ep: bool = False
+    three2two: bool = True
+
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0
     trajectory_pdm_weight = {
@@ -35,6 +43,7 @@ class HydraConfig(TransfuserConfig):
     vocab_path: str = None
     normalize_vocab_pos: bool = False
     num_ego_status: int = 1
+    fusion_layers: int = 3
 
     ckpt_path: str = None
     sigma: float = 0.5
@@ -45,6 +54,7 @@ class HydraConfig(TransfuserConfig):
     extra_traj_layer: bool = False
 
     use_back_view: bool = False
+    use_lr_view: bool = False
 
     extra_tr: bool = False
     vadv2_head_nhead: int = 8
@@ -71,6 +81,7 @@ class HydraConfig(TransfuserConfig):
 
     lr_mult_backbone: float = 1.0
     backbone_wd: float = 0.0
+    weight_decay: float = 0.0
 
     # lidar backbone
     lidar_architecture: str = "resnet34"

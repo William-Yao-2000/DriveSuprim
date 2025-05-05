@@ -5,9 +5,7 @@ Implements the TransFuser vision backbone.
 import timm
 import torch
 from torch import nn
-
-from navsim.agents.hydra_plus.hydra_config import HydraConfig
-
+import torch.nn.functional as F
 from navsim.agents.backbones.eva import EVAViT
 try:
     from navsim.agents.backbones.internimage import InternImage
@@ -18,8 +16,8 @@ except:
 
 from navsim.agents.utils.vit import DAViT
 
-
-class HydraBackbone(nn.Module):
+from navsim.agents.hydra_plus.hydra_config import HydraConfig
+class HydraBackboneBEVQ(nn.Module):
     """
     Multi-scale Fusion Transformer for image + LiDAR feature fusion
     """
@@ -72,14 +70,6 @@ class HydraBackbone(nn.Module):
                 output_missing_index_as_none=False
             )
             vit_channels = 1536
-        elif config.backbone_type == 'vit':
-            self.image_encoder = DAViT(ckpt=config.vit_ckpt)
-            vit_channels = 1024
-        elif config.backbone_type == 'resnet':
-            self.image_encoder = timm.create_model(
-                'resnet34', pretrained=False, features_only=True
-            )
-            vit_channels = 512
         elif config.backbone_type == 'sptr':
             img_vit_size = (config.camera_height, config.camera_width)
             self.image_encoder = EVAViT(
@@ -105,41 +95,123 @@ class HydraBackbone(nn.Module):
             )
             self.image_encoder.init_weights(config.sptr_ckpt)
             vit_channels = 1024
-
+        elif config.backbone_type == 'vit':
+            self.image_encoder = DAViT(ckpt=config.vit_ckpt)
+            vit_channels = 1024
+        elif config.backbone_type == 'resnet':
+            self.image_encoder = timm.create_model(
+                'resnet34', pretrained=False, features_only=True
+            )
+            vit_channels = 512
         else:
-            raise ValueError('Unsupported backbone in hydra_backbone')
+            raise ValueError
 
         self.avgpool_img = nn.AdaptiveAvgPool2d(
             (self.config.img_vert_anchors, self.config.img_horz_anchors)
         )
         self.img_feat_c = vit_channels
 
-    def forward(self, image):
-        B, C, H, W = image.shape
+        self.bev_h, self.bev_w = 8, 8
+        self.bev_queries = nn.Embedding(
+            self.bev_h * self.bev_w, self.img_feat_c
+        )
+        self.pos_emb = nn.Embedding(
+            (config.img_vert_anchors * config.img_horz_anchors +
+             config.img_vert_anchors * int(config.img_horz_anchors * 1920 / 4096)) * 2, self.img_feat_c
+        )
+        self.bev_emb = nn.Embedding(
+            self.bev_h * self.bev_w, self.img_feat_c
+        )
+
+        self.fusion_decoder = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(
+                d_model=self.img_feat_c,
+                nhead=16,
+                dim_feedforward=self.img_feat_c * 4,
+                dropout=0.0,
+                batch_first=True
+            ), self.config.fusion_layers
+        )
+
+        channel = self.config.bev_features_channels
+        self.relu = nn.ReLU(inplace=True)
+        # top down
+        if self.config.detect_boxes or self.config.use_bev_semantic:
+            self.upsample = nn.Upsample(
+                scale_factor=self.config.bev_upsample_factor,
+                mode="bilinear",
+                align_corners=False,
+            )
+            self.upsample2 = nn.Upsample(
+                size=(
+                    self.config.lidar_resolution_height
+                    // self.config.bev_down_sample_factor,
+                    self.config.lidar_resolution_width
+                    // self.config.bev_down_sample_factor,
+                ),
+                mode="bilinear",
+                align_corners=False,
+            )
+
+            self.up_conv5 = nn.Conv2d(channel, channel, (3, 3), padding=1)
+            self.up_conv4 = nn.Conv2d(channel, channel, (3, 3), padding=1)
+
+            # lateral
+            self.c5_conv = nn.Conv2d(
+                self.img_feat_c,
+                channel,
+                (1, 1),
+            )
+
+    def top_down(self, x):
+        p5 = self.relu(self.c5_conv(x))
+        p4 = self.relu(self.up_conv5(self.upsample(p5)))
+        p3 = self.relu(self.up_conv4(self.upsample2(p4)))
+        return p3
+
+    def encode_img(self, img):
+        B, C, H, W = img.shape
         if self.backbone_type == 'vov':
-            image_features = self.image_encoder(image)[-1]
+            image_features = self.image_encoder(img)[-1]
         elif self.backbone_type == 'sptr':
             half_w = W // 2
-            image_left = image[..., :half_w]
-            image_right = image[..., half_w:]
+            image_left = img[..., :half_w]
+            image_right = img[..., half_w:]
             image_features_left = self.image_encoder(image_left)[-1]
             image_features_right = self.image_encoder(image_right)[-1]
             image_features = torch.cat([
                 image_features_left, image_features_right
             ], -1)
-        elif self.backbone_type == 'vit':
-            quarter_w = W // 4
-            image_1 = image[..., :quarter_w]
-            image_2 = image[..., quarter_w:2 * quarter_w]
-            image_3 = image[..., 2 * quarter_w:3 * quarter_w]
-            image_4 = image[..., 3 * quarter_w:]
-            image_f_1 = self.image_encoder(image_1)[-1]
-            image_f_2 = self.image_encoder(image_2)[-1]
-            image_f_3 = self.image_encoder(image_3)[-1]
-            image_f_4 = self.image_encoder(image_4)[-1]
-            image_features = torch.cat([
-                image_f_1, image_f_2, image_f_3, image_f_4
-            ], -1)
         else:
             raise ValueError('Forward wrong backbone')
-        return self.avgpool_img(image_features)
+        img_tokens = self.avgpool_img(image_features)
+        return img_tokens.flatten(-2, -1).permute(0, 2, 1)
+
+    def encode_img_single(self, img):
+        img_features = self.image_encoder(img)[-1]
+        B, C, H, W = img_features.shape
+
+        img_tokens = F.adaptive_avg_pool2d(img_features, output_size=(H // 2, W // 2))
+        return img_tokens.flatten(-2, -1).permute(0, 2, 1)
+
+
+    def forward(self, image_front, image_back, image_left, image_right):
+        B = image_front.shape[0]
+
+        image_features_front = self.encode_img(image_front)
+        image_features_back = self.encode_img(image_back)
+        image_features_left = self.encode_img_single(image_left)
+        image_features_right = self.encode_img_single(image_right)
+
+        img_tokens = torch.cat([image_features_front, image_features_back, image_features_left, image_features_right], 1)
+        bev_tokens = self.bev_queries.weight[None].repeat(B, 1, 1)
+
+        bev_tokens = self.fusion_decoder(
+            tgt=bev_tokens + self.bev_emb.weight[None].repeat(B, 1, 1),
+            memory=img_tokens + self.pos_emb.weight[None].repeat(B, 1, 1)
+        )
+
+        up_bev_tokens = self.top_down(
+            bev_tokens.permute(0, 2, 1).view(B, self.img_feat_c, self.bev_h, self.bev_w)
+        )
+        return img_tokens, bev_tokens, up_bev_tokens

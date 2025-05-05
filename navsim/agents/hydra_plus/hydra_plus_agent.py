@@ -9,6 +9,7 @@ from torch.optim.lr_scheduler import LRScheduler, OneCycleLR
 
 from navsim.agents.hydra_plus.hydra_features import HydraFeatureBuilder, HydraTargetBuilder
 from navsim.agents.hydra_plus.hydra_model import HydraModel
+from navsim.agents.hydra_plus.hydra_model_bev import HydraModelBEV
 from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import (
     AbstractFeatureBuilder,
@@ -37,7 +38,10 @@ def three_to_two_classes(x):
 
 def hydra_kd_imi_agent_loss(
         targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor], config: HydraConfig,
-        vocab_pdm_score
+        vocab_pdm_score,
+        regression_ep=False,
+        three2two=True,
+        include_dp=False
 ):
     """
     Helper function calculating complete loss of Transfuser
@@ -65,12 +69,22 @@ def hydra_kd_imi_agent_loss(
                                                  vocab_pdm_score['drivable_area_compliance'].to(dtype))
     ttc_loss = F.binary_cross_entropy_with_logits(time_to_collision_within_bound,
                                                   vocab_pdm_score['time_to_collision_within_bound'].to(dtype))
-    noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, three_to_two_classes(
-        vocab_pdm_score['no_at_fault_collisions'].to(dtype)))
-    progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(dtype))
+    if three2two:
+        noc_gt = three_to_two_classes(vocab_pdm_score['no_at_fault_collisions'].to(dtype))
+    else:
+        noc_gt = vocab_pdm_score['no_at_fault_collisions'].to(dtype)
+    noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, noc_gt)
+
+    if regression_ep:
+        progress_loss = F.mse_loss(ego_progress.sigmoid(), vocab_pdm_score['ego_progress'].to(dtype))
+    else:
+        progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(dtype))
     # expansion
-    ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, three_to_two_classes(
-        vocab_pdm_score['driving_direction_compliance'].to(dtype)))
+    if three2two:
+        ddc_gt = three_to_two_classes(vocab_pdm_score['driving_direction_compliance'].to(dtype))
+    else:
+        ddc_gt = vocab_pdm_score['driving_direction_compliance'].to(dtype)
+    ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, ddc_gt)
     lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(dtype))
     tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance,
                                                  vocab_pdm_score['traffic_light_compliance'].to(dtype))
@@ -82,17 +96,14 @@ def hydra_kd_imi_agent_loss(
     # 4, 9, ..., 39
     sampled_timepoints = [5 * k - 1 for k in range(1, 9)]
     B = target_traj.shape[0]
+    if include_dp:
+        l2_distance = -(
+                    (vocab[:, :, sampled_timepoints] - target_traj[:, None]) ** 2) / config.sigma
+        imi_loss = F.cross_entropy(imi, l2_distance.sum((-2, -1)).softmax(1))
 
-    l2_distance = -((vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / config.sigma
-    imi_loss = F.cross_entropy(imi, l2_distance.sum((-2, -1)).softmax(1))
-
-    # one-hot
-    # l2_distance = (vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2
-    # l2_distance = l2_distance.sum((-2, -1))
-    # min_idx = l2_distance.argmin(1)
-    # imi_gt = torch.zeros_like(imi)
-    # imi_gt = imi_gt.scatter_(1, min_idx.unsqueeze(1), 1)
-    # imi_loss = F.cross_entropy(imi, imi_gt)
+    else:
+        l2_distance = -((vocab[:, sampled_timepoints][None].repeat(B, 1, 1, 1) - target_traj[:, None]) ** 2) / config.sigma
+        imi_loss = F.cross_entropy(imi, l2_distance.sum((-2, -1)).softmax(1))
 
     imi_loss_final = config.trajectory_imi_weight * imi_loss
     noc_loss_final = config.trajectory_pdm_weight['no_at_fault_collisions'] * noc_loss
@@ -113,9 +124,9 @@ def hydra_kd_imi_agent_loss(
             + ddc_loss_final
             + lk_loss_final
             + tl_loss_final
-            # + comfort_loss_final
+        # + comfort_loss_final
     )
-    return loss, {
+    loss_dict = {
         'imi_loss': imi_loss_final,
         'pdm_noc_loss': noc_loss_final,
         'pdm_da_loss': da_loss_final,
@@ -126,6 +137,13 @@ def hydra_kd_imi_agent_loss(
         'pdm_tl_loss': tl_loss_final,
         # 'pdm_comfort_loss': comfort_loss_final
     }
+    if 'bev_semantic_map' in predictions:
+        bev_semantic_loss = F.cross_entropy(predictions["bev_semantic_map"], targets["bev_semantic_map"].long())
+        bev_semantic_loss = bev_semantic_loss * 10.0
+        loss += bev_semantic_loss
+        loss_dict['bev_semantic_loss'] = bev_semantic_loss
+
+    return loss, loss_dict
 
 
 class HydraPlusAgent(AbstractAgent):
@@ -139,11 +157,16 @@ class HydraPlusAgent(AbstractAgent):
         super().__init__(
             trajectory_sampling=config.trajectory_sampling
         )
+        if config.regression_ep:
+            ep_lw = 50.0
+        else:
+            ep_lw = 2.0
+
         config.trajectory_pdm_weight = {
             'no_at_fault_collisions': 3.0,
             'drivable_area_compliance': 3.0,
             'time_to_collision_within_bound': 4.0,
-            'ego_progress': 2.0,
+            'ego_progress': ep_lw,
             'driving_direction_compliance': 1.0,
             'lane_keeping': 2.0,
             'traffic_light_compliance': 3.0,
@@ -153,7 +176,12 @@ class HydraPlusAgent(AbstractAgent):
         self._lr = lr
         self.metrics = list(config.trajectory_pdm_weight.keys())
         self._checkpoint_path = checkpoint_path
-        self.model = HydraModel(config)
+        if self._config.version == 'default':
+            self.model = HydraModel(config)
+        elif self._config.version == 'bev':
+            self.model = HydraModelBEV(config)
+        else:
+            raise ValueError('Unsupported hydra version')
         self.vocab_size = config.vocab_size
         self.backbone_wd = config.backbone_wd
         self.scheduler = config.scheduler
@@ -194,6 +222,9 @@ class HydraPlusAgent(AbstractAgent):
     def forward(self, features: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return self.model(features)
 
+    def evaluate_dp_proposals(self, features: Dict[str, torch.Tensor], dp_proposals) -> Dict[str, torch.Tensor]:
+        return self.model.evaluate_dp_proposals(features, dp_proposals)
+
     def forward_train(self, features, interpolated_traj):
         return self.model(features, interpolated_traj)
 
@@ -210,7 +241,9 @@ class HydraPlusAgent(AbstractAgent):
             tmp = [self.vocab_pdm_score_full[token][k][None] for token in tokens]
             scores[k] = (torch.from_numpy(np.concatenate(tmp, axis=0))
                          .to(predictions['trajectory'].device))
-        return hydra_kd_imi_agent_loss(targets, predictions, self._config, scores)
+        return hydra_kd_imi_agent_loss(targets, predictions, self._config, scores,
+                                       regression_ep=self._config.regression_ep,
+                                       three2two=self._config.three2two)
 
     def get_optimizers(self) -> Union[Optimizer, Dict[str, Union[Optimizer, LRScheduler]]]:
         backbone_params_name = '_backbone.image_encoder'
@@ -226,7 +259,7 @@ class HydraPlusAgent(AbstractAgent):
             }
         ]
         if self.scheduler == 'default':
-            return torch.optim.Adam(params_lr_dict, lr=self._lr)
+            return torch.optim.Adam(params_lr_dict, lr=self._lr, weight_decay=self._config.weight_decay)
         elif self.scheduler == 'cycle':
             optim = torch.optim.Adam(params_lr_dict, lr=self._lr)
             return {

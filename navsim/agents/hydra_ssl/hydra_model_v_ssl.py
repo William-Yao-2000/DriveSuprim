@@ -136,7 +136,12 @@ class HydraModel(nn.Module):
         # agents_query = self._tf_decoder(query, keyval)
 
         output.update(img_feat_dict)
-        trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj)
+        trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj, tokens=tokens)
+
+        # zxli: early return without second stage
+        if self._trajectory_head.dp_preds is not None:
+            output.update(trajectory)
+            return output
 
         if self.use_multi_stage:
             if self._config.lab.use_higher_res_feat_in_refinement:
@@ -266,8 +271,15 @@ class HydraTrajHead(nn.Module):
                 nn.ReLU(),
                 nn.Linear(d_ffn, d_model),
             )
+        # zxli: load dp proposals
+        dp_preds_path = os.getenv('DP_PREDS', None)
+        if dp_preds_path is not None:
+            print(f'Loading DP PREDS from {dp_preds_path}')
+            self.dp_preds = pickle.load(open(dp_preds_path, 'rb'))
+        else:
+            self.dp_preds = None
 
-    def forward(self, bev_feature, status_encoding, interpolated_traj=None) -> Dict[str, torch.Tensor]:
+    def forward(self, bev_feature, status_encoding, interpolated_traj=None, tokens=None) -> Dict[str, torch.Tensor]:
         # todo sinusoidal embedding
         # vocab: 4096, 40, 3
         # bev_feature: B, 32, C
@@ -284,11 +296,28 @@ class HydraTrajHead(nn.Module):
                 ], dim=-1
             )
 
-        if self.normalize_vocab_pos:
-            embedded_vocab = self.pos_embed(vocab.view(L, -1))[None]
-            embedded_vocab = self.encoder(embedded_vocab).repeat(B, 1, 1)
+        if self.dp_preds is None:
+            if self.normalize_vocab_pos:
+                embedded_vocab = self.pos_embed(vocab.view(L, -1))[None]
+                embedded_vocab = self.encoder(embedded_vocab).repeat(B, 1, 1)
+            else:
+                embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
         else:
-            embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
+            # zxli: combined inference with dp
+            curr_dp_preds = []
+            for token in tokens:
+                curr_dp_preds.append(torch.from_numpy(self.dp_preds[token]['interpolated_proposal']).float().to(bev_feature.device)[None])
+            # B, N, 40, 3
+            curr_dp_preds = torch.cat(curr_dp_preds, 0)
+            NUM_PROPOSALS = curr_dp_preds.shape[1]
+            dp_proposals = curr_dp_preds.view(B, NUM_PROPOSALS, -1)
+            vocab = torch.cat([
+                vocab.view(L, -1)[None].repeat(B, 1, 1),
+                dp_proposals
+            ], 1)
+            embedded_vocab = self.pos_embed(vocab)
+            embedded_vocab = self.encoder(embedded_vocab)
+            # end of combined inference with dp
 
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
@@ -312,6 +341,15 @@ class HydraTrajHead(nn.Module):
                    1.0 * result['history_comfort'].sigmoid()
                    ).log()
         )
+
+        # zxli: return without second stage
+        if self.dp_preds is not None:
+            # scores = scores[:, L:]
+            selected_indices = scores.argmax(1)
+            scene_cnt_tensor = torch.arange(B, device=scores.device)
+            result["trajectory"] = vocab[scene_cnt_tensor, selected_indices].view(B, HORIZON, 3)
+            return result
+
         if self._config.lab.optimize_prev_frame_traj_for_ec:
             scores += 0.008 * result['imi_prev'].softmax(-1).log()
         

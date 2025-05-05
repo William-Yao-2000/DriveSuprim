@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from navsim.agents.dp.dp_model import TemporalAttention
 from navsim.agents.hydra_plus.hydra_backbone import HydraBackbone
 from navsim.agents.hydra_plus.hydra_config import HydraConfig
 from navsim.agents.transfuser.transfuser_model import AgentHead
@@ -21,12 +20,7 @@ class HydraModel(nn.Module):
         ]
 
         self._config = config
-        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet', 'eva', 'moe', 'moe_ult32', 'swin']
-        if config.backbone_type == 'eva':
-            raise ValueError(f'{config.backbone_type} not supported')
-        elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or \
-                config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type == 'resnet':
-            self._backbone = HydraBackbone(config)
+        self._backbone = HydraBackbone(config)
 
         img_num = 2 if config.use_back_view else 1
         self._keyval_embedding = nn.Embedding(
@@ -80,6 +74,29 @@ class HydraModel(nn.Module):
         img_features = self._backbone(camera_feature)
         img_features = self.downscale_layer(img_features)
         return img_features
+
+    def evaluate_dp_proposals(self, features, dp_proposals, topk=10):
+        status_feature: torch.Tensor = features["status_feature"][0]
+        camera_feature = features["camera_feature"]
+
+        if self._config.num_ego_status == 1 and status_feature.shape[1] == 32:
+            status_encoding = self._status_encoding(status_feature[:, :8])
+        else:
+            status_encoding = self._status_encoding(status_feature)
+
+        # original
+        if isinstance(camera_feature, list):
+            camera_feature = camera_feature[-1]
+        img_features = self.img_feat_blc(camera_feature)
+        if self._config.use_back_view:
+            img_features_back = self.img_feat_blc(features["camera_feature_back"])
+            img_features = torch.cat([img_features, img_features_back], 1)
+        keyval = img_features
+        keyval += self._keyval_embedding.weight[None, ...]
+        output: Dict[str, torch.Tensor] = {}
+        trajectory = self._trajectory_head.eval_dp_proposals(keyval, status_encoding, dp_proposals, topk=topk)
+        output.update(trajectory)
+        return output
 
     def forward(self, features: Dict[str, torch.Tensor],
                 interpolated_traj=None) -> Dict[str, torch.Tensor]:
@@ -283,9 +300,77 @@ class HydraTrajHead(nn.Module):
         #                5 * result['lane_keeping'].sigmoid()).log()
         # )
 
-
         selected_indices = scores.argmax(1)
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
         result["selected_indices"] = selected_indices
+        return result
+
+    def eval_dp_proposals(self, bev_feature, status_encoding, dp_proposals, topk=10) -> Dict[str, torch.Tensor]:
+        # vocab: 4096, 40, 3
+        # bev_feature: B, 32, C
+        # embedded_vocab: B, 4096, C
+        vocab = self.vocab.data
+        L, HORIZON, TRAJ_DIM = vocab.shape
+        B = bev_feature.shape[0]
+
+        NUM_PROPOSALS = dp_proposals.shape[1]
+        dp_proposals = dp_proposals.view(B, NUM_PROPOSALS, -1)
+        vocab = torch.cat([
+            vocab.view(L, -1)[None].repeat(B, 1, 1),
+            dp_proposals
+        ], 1)
+
+        embedded_vocab = self.pos_embed(vocab)
+        embedded_vocab = self.encoder(embedded_vocab)
+
+        tr_out = self.transformer(embedded_vocab, bev_feature)
+        dist_status = tr_out + status_encoding.unsqueeze(1)
+        result = {}
+        # selected_indices: B,
+        for k, head in self.heads.items():
+            result[k] = head(dist_status).squeeze(-1)
+
+        # only dp: 87 > dp and vocab: 86.6
+        scores = (
+                         0.01 * result['imi'].softmax(-1).log() +
+                         0.1 * result['traffic_light_compliance'].sigmoid().log() +
+                         0.5 * result['no_at_fault_collisions'].sigmoid().log() +
+                         0.5 * result['drivable_area_compliance'].sigmoid().log() +
+                         0.5 * result['driving_direction_compliance'].sigmoid().log() +
+                         3.0 * (5.0 * result['time_to_collision_within_bound'].sigmoid() +
+                                5.0 * result['ego_progress'].sigmoid() +
+                                2.0 * result['lane_keeping'].sigmoid()
+                                ).log()
+                 )[:, L:]
+        selected_indices = scores.argmax(1)
+        scene_cnt_tensor = torch.arange(B, device=scores.device)
+
+        result["trajectory"] = dp_proposals[scene_cnt_tensor, selected_indices].view(B, HORIZON, 3)
+        result['overall_scores'] = (
+                                           1 * result['traffic_light_compliance'].sigmoid() *
+                                           1 * result['no_at_fault_collisions'].sigmoid() *
+                                           1 * result['drivable_area_compliance'].sigmoid() *
+                                           1 * result['driving_direction_compliance'].sigmoid() *
+                                           (5.0 * result['time_to_collision_within_bound'].sigmoid() +
+                                            5.0 * result['ego_progress'].sigmoid() +
+                                            2.0 * result['lane_keeping'].sigmoid()) / 12.0
+                                   )[:, L:]
+        result['overall_log_scores'] = scores
+        _, topk_indices = torch.topk(result['overall_log_scores'], k=topk, dim=1)  # [B, 10]
+
+        # rewrite subscore predictions: 16384->16384+top-10
+
+        for k in self.heads.keys():
+            # for imi we train the model with a vocab 16384+all 100
+            if k == 'imi':
+                continue
+            original_scores = result[k]
+            vocab_scores = original_scores[:, :L]  # 保留原始vocab评分 [B, 16384]
+            dp_scores = original_scores[:, L:]  # DP提议评分 [B, 100]
+
+            # 从DP评分中取top10并拼接
+            selected_dp_scores = torch.gather(dp_scores, dim=1, index=topk_indices)  # [B, 10]
+            result[k] = torch.cat([vocab_scores, selected_dp_scores], dim=1)  # [B, 16384 + 10]
+        result['trajectory_vocab'] = vocab.view(B, NUM_PROPOSALS+L, HORIZON, TRAJ_DIM)
         return result

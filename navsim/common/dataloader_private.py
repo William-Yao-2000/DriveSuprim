@@ -13,31 +13,31 @@ from navsim.planning.metric_caching.metric_cache import MetricCache
 
 FrameList = List[Dict[str, Any]]
 
-
 import pickle
 from pathlib import Path
 from collections import defaultdict
 from tqdm import tqdm
 
-def group_frames_by_sequence(file_path, sequence_length=4):
 
+def group_frames_by_sequence(file_path, sequence_length=4):
     with open(file_path, 'rb') as f:
         scene_dict_list = pickle.load(f)
     scene_groups = defaultdict(list)
     for frame in scene_dict_list:
         scene_token = frame['scene_token']
         scene_groups[scene_token].append(frame)
-    
+
     for scene_token in scene_groups:
         scene_groups[scene_token].sort(key=lambda x: x['frame_idx'])
-    
+
     sequence_groups = []
     for scene_token, frames in tqdm(scene_groups.items(), desc="Loading original scenes"):
         if len(frames) == 5:
             sequence_groups.append(frames[0:4])
             sequence_groups.append(frames[1:5])
-    
+
     return sequence_groups
+
 
 def filter_scenes(data_path: Path, scene_filter: SceneFilter) -> Tuple[Dict[str, FrameList], List[str]]:
     """
@@ -68,12 +68,11 @@ def filter_scenes(data_path: Path, scene_filter: SceneFilter) -> Tuple[Dict[str,
     return filtered_scenes
 
 
-
 def filter_synthetic_scenes(
-    data_path: Path, 
-    scene_filter: SceneFilter, 
-    sensor_config: SensorConfig = SensorConfig.build_no_sensors(),
-    sensor_blobs_path: Path = None,
+        data_path: Path,
+        scene_filter: SceneFilter,
+        sensor_config: SensorConfig = SensorConfig.build_no_sensors(),
+        sensor_blobs_path: Path = None,
 ) -> Dict[str, Tuple[Path, str]]:
     # Load all the synthetic scenes that belong to the original scenes already loaded
     loaded_scenes: Dict[str, Tuple[Path, str, int]] = {}
@@ -89,23 +88,23 @@ def filter_synthetic_scenes(
         synthetic_scene_pre = Scene.from_scene_dict_list_private(
             scene_dict_list[:-1],
             sensor_blobs_path,
-            scene_filter.num_history_frames, 
+            scene_filter.num_history_frames,
             scene_filter.num_future_frames,
             sensor_config=sensor_config)
-        
+
         synthetic_scene_now = Scene.from_scene_dict_list_private(
             scene_dict_list[1:],
             sensor_blobs_path,
-            scene_filter.num_history_frames, 
+            scene_filter.num_history_frames,
             scene_filter.num_future_frames,
             sensor_config=sensor_config)
 
-
         if filter_initial_tokens and synthetic_scene_pre.scene_metadata.initial_token not in scene_filter.reactive_synthetic_initial_tokens:
             continue
-
-        loaded_scenes.update({synthetic_scene_pre.scene_metadata.initial_token: synthetic_scene_pre})
-        loaded_scenes.update({synthetic_scene_now.scene_metadata.initial_token: synthetic_scene_now})
+        log_name_pre = synthetic_scene_pre.scene_metadata.log_name
+        log_name_now = synthetic_scene_now.scene_metadata.log_name
+        loaded_scenes.update({synthetic_scene_pre.scene_metadata.initial_token: [scene_path, log_name_pre]})
+        loaded_scenes.update({synthetic_scene_now.scene_metadata.initial_token: [scene_path, log_name_now]})
 
     return loaded_scenes
 
@@ -114,13 +113,13 @@ class SceneLoader:
     """Simple data loader of scenes from logs."""
 
     def __init__(
-        self,
-        data_path: Path,
-        original_sensor_path: Path,
-        scene_filter: SceneFilter,
-        synthetic_sensor_path: Path = None,
-        synthetic_scenes_path: Path = None,
-        sensor_config: SensorConfig = SensorConfig.build_no_sensors(),
+            self,
+            data_path: Path,
+            original_sensor_path: Path,
+            scene_filter: SceneFilter,
+            synthetic_sensor_path: Path = None,
+            synthetic_scenes_path: Path = None,
+            sensor_config: SensorConfig = SensorConfig.build_no_sensors(),
     ):
         """
         Initializes the scene data loader.
@@ -139,12 +138,12 @@ class SceneLoader:
 
         if scene_filter.include_synthetic_scenes:
             assert (
-                synthetic_scenes_path is not None
+                    synthetic_scenes_path is not None
             ), "Synthetic scenes path cannot be None, when synthetic scenes_filter.include_synthetic_scenes is set to True."
             self.synthetic_scenes = filter_synthetic_scenes(
                 data_path=synthetic_scenes_path,
                 scene_filter=scene_filter,
-                sensor_config=self._sensor_config,
+                sensor_config=SensorConfig.build_no_sensors(),
                 sensor_blobs_path=self._synthetic_sensor_path,
             )
             self.synthetic_scenes_tokens = set(self.synthetic_scenes.keys())
@@ -236,13 +235,32 @@ class SceneLoader:
         """
         assert token in self.tokens
         if token in self.synthetic_scenes:
-            return Scene.load_from_disk(
-                file_path=self.synthetic_scenes[token][0],
-                sensor_blobs_path=self._synthetic_sensor_path,
-                sensor_config=self._sensor_config,
-            )
+            scene_path = self.synthetic_scenes[token][0]
+            with open(scene_path, "rb") as f:
+                scene_dict_list = pickle.load(f)
+
+            synthetic_scene_pre = Scene.from_scene_dict_list_private(
+                scene_dict_list[:-1],
+                self._synthetic_sensor_path,
+                self._scene_filter.num_history_frames,
+                self._scene_filter.num_future_frames,
+                sensor_config=self._sensor_config)
+
+            synthetic_scene_now = Scene.from_scene_dict_list_private(
+                scene_dict_list[1:],
+                self._synthetic_sensor_path,
+                self._scene_filter.num_history_frames,
+                self._scene_filter.num_future_frames,
+                sensor_config=self._sensor_config)
+
+            tmp_synth_scene_dict = {
+                synthetic_scene_now.scene_metadata.initial_token: synthetic_scene_now,
+                synthetic_scene_pre.scene_metadata.initial_token: synthetic_scene_pre
+            }
+
+            return tmp_synth_scene_dict[token]
         else:
-            return Scene.from_scene_dict_list(
+            return Scene.from_scene_dict_list_private(
                 self.scene_frames_dicts[token],
                 self._original_sensor_path,
                 num_history_frames=self._scene_filter.num_history_frames,
