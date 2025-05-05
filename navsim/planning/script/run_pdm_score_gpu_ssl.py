@@ -266,7 +266,7 @@ def main(cfg: DictConfig) -> None:
 
     agent_ckpt_path = Path(cfg.agent.checkpoint_path).parent.absolute().__str__()
     ckpt_name = Path(cfg.agent.checkpoint_path).name.split('.')[0]
-    # pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{ckpt_name}.pkl', 'wb'))
+    pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{ckpt_name}.pkl', 'wb'))
 
     data_points = [
         {
