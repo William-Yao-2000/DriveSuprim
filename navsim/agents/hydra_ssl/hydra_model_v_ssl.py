@@ -138,6 +138,11 @@ class HydraModel(nn.Module):
         output.update(img_feat_dict)
         trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj, tokens=tokens)
 
+        # zxli: early return without second stage
+        if self._trajectory_head.dp_preds is not None:
+            output.update(trajectory)
+            return output
+
         if self.use_multi_stage:
             if self._config.lab.use_higher_res_feat_in_refinement:
                 bev_feat_fg = img_feat_dict['higher_res_feat']
