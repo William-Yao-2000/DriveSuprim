@@ -72,6 +72,7 @@ def main(cfg: DictConfig) -> None:
         for d in proc_prediction:
             merged_predictions.update(d)
 
+    print(f'PKL Saved to {os.getenv("SUBSCORE_PATH")}')
     with open(os.getenv('SUBSCORE_PATH'), "wb") as file:
         pickle.dump(merged_predictions, file)
 
