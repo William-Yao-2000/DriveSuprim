@@ -6,3 +6,4 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training.py \
     trainer.params.max_epochs=50 \
     trainer.params.limit_val_batches=0.05 \
     train_test_split=$TRAIN_TEST_SPLIT \
+    cache_path=null
