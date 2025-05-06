@@ -143,7 +143,7 @@ class EgoStatusMLPAgent(AbstractAgent):
                 save_top_k=30,
                 monitor="val/loss-ori",
                 mode="min",
-                dirpath=f"{os.environ.get('NAVSIM_EXP_ROOT')}/{self._checkpoint_path}/",
+                dirpath=f"{os.environ.get('NAVSIM_EXP_ROOT')}/training/ego_mlp_agent",
                 filename="{epoch:02d}-{step:04d}",
             )
         ]
