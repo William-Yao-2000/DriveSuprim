@@ -122,7 +122,9 @@ class EgoStatusMLPAgent(AbstractAgent):
         predictions: Dict[str, torch.Tensor],
     ) -> torch.Tensor:
         """Inherited, see superclass."""
-        return torch.nn.functional.l1_loss(predictions["trajectory"], targets["trajectory"])
+        loss = torch.nn.functional.l1_loss(predictions["trajectory"], targets["trajectory"])
+        loss_dict = {"l1_loss": loss}
+        return loss, loss_dict
 
     def get_optimizers(
         self,

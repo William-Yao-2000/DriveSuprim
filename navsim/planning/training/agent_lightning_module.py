@@ -13,6 +13,7 @@ from torch import Tensor
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.dp.dp_agent import DPAgent
+from navsim.agents.ego_status_mlp_agent import EgoStatusMLPAgent
 from navsim.agents.hydra_plus.hydra_features import state2traj
 from navsim.agents.hydra_plus.hydra_plus_agent import HydraPlusAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
@@ -49,11 +50,14 @@ class AgentLightningModule(pl.LightningModule):
         :param logging_prefix: prefix where to log step
         :return: scalar loss
         """
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+
         features, targets, tokens = batch
 
         prediction = self.agent.forward(features)
 
-        if isinstance(self.agent, TransfuserAgent):
+        if isinstance(self.agent, TransfuserAgent) or isinstance(self.agent, EgoStatusMLPAgent):
             loss, loss_dict = self.agent.compute_loss(features, targets, prediction)
         else:
             loss, loss_dict = self.agent.compute_loss(features, targets, prediction, tokens)

@@ -87,6 +87,9 @@ def main(cfg: DictConfig) -> None:
     Main entrypoint for training an agent.
     :param cfg: omegaconf dictionary
     """
+    if cfg.debug:
+        import os; os.environ['ROBUST_HYDRA_DEBUG'] = 'true'
+        import pdb; pdb.set_trace()
 
     pl.seed_everything(cfg.seed, workers=True)
     logger.info(f"Global Seed set to {cfg.seed}")
