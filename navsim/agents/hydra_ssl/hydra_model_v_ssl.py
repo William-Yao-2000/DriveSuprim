@@ -22,11 +22,12 @@ class HydraModel(nn.Module):
         ]
 
         self._config = config
-        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet34', 'resnet50', 'eva', 'moe', 'moe_ult32', 'swin']
+        assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet34', 'resnet50', 'eva', 'moe', 'moe_ult32', 'swin', 'sptr']
         if config.backbone_type == 'eva':
             raise ValueError(f'{config.backbone_type} not supported')
         elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or \
-            config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type in ('resnet34', 'resnet50'):
+            config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type in ('resnet34', 'resnet50') or \
+            config.backbone_type == 'sptr':
             self._backbone = HydraBackbonePE(config)
 
         img_num = 2 if config.use_back_view else 1
