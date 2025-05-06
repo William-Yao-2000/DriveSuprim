@@ -1,9 +1,13 @@
+import os
 from typing import Any, Dict, List, Optional, Union
 
 import torch
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
+
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.common.dataclasses import AgentInput, Scene, SensorConfig
@@ -131,3 +135,15 @@ class EgoStatusMLPAgent(AbstractAgent):
     ) -> Union[Optimizer, Dict[str, Union[Optimizer, LRScheduler]]]:
         """Inherited, see superclass."""
         return torch.optim.Adam(self._mlp.parameters(), lr=self._lr)
+
+    def get_training_callbacks(self) -> List[pl.Callback]:
+        return [
+            # TransfuserCallback(self._config),
+            ModelCheckpoint(
+                save_top_k=30,
+                monitor="val/loss-ori",
+                mode="min",
+                dirpath=f"{os.environ.get('NAVSIM_EXP_ROOT')}/{self._checkpoint_path}/",
+                filename="{epoch:02d}-{step:04d}",
+            )
+        ]
