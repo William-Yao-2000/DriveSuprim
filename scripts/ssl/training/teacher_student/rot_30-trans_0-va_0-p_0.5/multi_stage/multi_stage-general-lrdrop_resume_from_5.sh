@@ -40,7 +40,7 @@ command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_s
     ~trainer.params.strategy \
     trainer.params.max_epochs=$epoch \
     trainer.params.limit_val_batches=0.05 \
-    agent.config.ckpt_path=$dir \
+    agent.config.ckpt_path=$dir/lr_drop \
     agent.lr=$lr \
     agent.config.ego_perturb.mode=load_from_offline \
     agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_$rot-trans_$trans-va_$va-p_$probability-ensemble.json \
