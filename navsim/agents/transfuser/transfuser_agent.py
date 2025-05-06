@@ -1,6 +1,8 @@
+import os
 from typing import Any, Dict, List, Optional, Union
 
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
 from torch.optim import Optimizer
@@ -100,4 +102,13 @@ class TransfuserAgent(AbstractAgent):
 
     def get_training_callbacks(self) -> List[pl.Callback]:
         """Inherited, see superclass."""
-        return [TransfuserCallback(self._config)]
+        return [# TransfuserCallback(self._config),
+            ModelCheckpoint(
+                save_top_k=30,
+                monitor="val/loss",
+                mode="min",
+                dirpath=f"{os.environ.get('NAVSIM_EXP_ROOT')}/training/transfuser_agent",
+                filename="{epoch:02d}-{step:04d}",
+            ),
+            TransfuserCallback(self._config)
+        ]

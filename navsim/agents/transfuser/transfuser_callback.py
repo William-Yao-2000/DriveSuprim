@@ -47,7 +47,7 @@ class TransfuserCallback(pl.Callback):
         """Inherited, see superclass."""
         device = lightning_module.device
         for idx_plot in range(self._num_plots):
-            features, targets = next(iter(trainer.val_dataloaders))
+            features, targets, tokens = next(iter(trainer.val_dataloaders))
             features, targets = dict_to_device(features, device), dict_to_device(targets, device)
             with torch.no_grad():
                 predictions = lightning_module.agent.forward(features)
@@ -76,7 +76,7 @@ class TransfuserCallback(pl.Callback):
 
         device = lightning_module.device
         for idx_plot in range(self._num_plots):
-            features, targets = next(iter(trainer.train_dataloader))
+            features, targets, tokens = next(iter(trainer.train_dataloader))
             features, targets = dict_to_device(features, device), dict_to_device(targets, device)
             with torch.no_grad():
                 predictions = lightning_module.agent.forward(features)

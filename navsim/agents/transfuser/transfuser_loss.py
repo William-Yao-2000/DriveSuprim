@@ -20,13 +20,19 @@ def transfuser_loss(targets: Dict[str, torch.Tensor], predictions: Dict[str, tor
     trajectory_loss = F.l1_loss(predictions["trajectory"], targets["trajectory"])
     agent_class_loss, agent_box_loss = _agent_loss(targets, predictions, config)
     bev_semantic_loss = F.cross_entropy(predictions["bev_semantic_map"], targets["bev_semantic_map"].long())
+    loss_dict = {
+        "trajectory_loss": config.trajectory_weight * trajectory_loss,
+        "agent_class_loss": config.agent_class_weight * agent_class_loss,
+        "agent_box_loss": config.agent_box_weight * agent_box_loss,
+        "bev_semantic_loss": config.bev_semantic_weight * bev_semantic_loss
+    }
     loss = (
         config.trajectory_weight * trajectory_loss
         + config.agent_class_weight * agent_class_loss
         + config.agent_box_weight * agent_box_loss
         + config.bev_semantic_weight * bev_semantic_loss
     )
-    return loss
+    return loss, loss_dict
 
 
 def _agent_loss(targets: Dict[str, torch.Tensor], predictions: Dict[str, torch.Tensor], config: TransfuserConfig):
