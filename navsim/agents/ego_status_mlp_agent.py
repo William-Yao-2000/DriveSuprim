@@ -141,7 +141,7 @@ class EgoStatusMLPAgent(AbstractAgent):
             # TransfuserCallback(self._config),
             ModelCheckpoint(
                 save_top_k=30,
-                monitor="val/loss-ori",
+                monitor="val/loss",
                 mode="min",
                 dirpath=f"{os.environ.get('NAVSIM_EXP_ROOT')}/training/ego_mlp_agent",
                 filename="{epoch:02d}-{step:04d}",
