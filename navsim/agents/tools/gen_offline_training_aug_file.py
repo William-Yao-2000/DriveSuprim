@@ -14,7 +14,7 @@ def main():
     parser.add_argument('--seed', default=2024, type=int, help='random seed')
     args = parser.parse_args()
 
-    with open('navsim/planning/script/config/common/scene_filter/navtrain.yaml', 'r', encoding='utf-8') as f:
+    with open('navsim/planning/script/config/common/train_test_split/scene_filter/navtrain.yaml', 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
     import pdb; pdb.set_trace()
     random.seed(args.seed)
