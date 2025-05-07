@@ -138,6 +138,7 @@ class PDMScorer:
         map_parameters: Optional[MapParameters] = None,
         simulated_agent_detections_tracks: Optional[List[DetectionsTracks]] = None,
         human_past_trajectory: Optional[InterpolatedTrajectory] = None,
+        if_return_pdms = False
     ) -> List[pd.DataFrame]:
         """
         TODO: Update this docstring
@@ -183,6 +184,7 @@ class PDMScorer:
         multiplicative_metrics_prods, weighted_metrics_all = self._multi_metrics.prod(axis=0), self._weighted_metrics
 
         results: List[pd.DataFrame] = []
+        pdms = []
         for proposal_idx in range(self._num_proposals):
 
             no_at_fault_collisions = self._multi_metrics[MultiMetricIndex.NO_COLLISION, proposal_idx]
@@ -219,6 +221,10 @@ class PDMScorer:
                     ]
                 )
             )
+            pdms.append(pdm_score)
+            
+        if if_return_pdms:
+            return results, pdms
         return results
 
     def _aggregate_pdm_scores(self) -> npt.NDArray[np.float64]:
