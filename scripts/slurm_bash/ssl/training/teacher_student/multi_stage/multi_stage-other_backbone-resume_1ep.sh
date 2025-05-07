@@ -20,13 +20,13 @@ do
         --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
         --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
         --email_mode never \
-        --duration 3 \
+        --duration 3.2 \
         --dependent_clones 0 \
         --partition $partition \
         --account av_research \
         -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash $bash_file $agent $num_refinement_stage $stage_layers $topks $epoch"
     
-    sleep 3.2h
+    sleep 3.5h
 done
 
 
