@@ -62,7 +62,7 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/evaluation/eval_vit-multi_stage.sh \
-    6 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256-hydra_img_vov_ssl \
-    1 3 256 hydra_img_vov_ssl
+bash scripts/ssl/evaluation/lab/eval_vit-multi_stage-traj_expansion_in_infer.sh \
+    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256 \
+    1 3 256
 '
