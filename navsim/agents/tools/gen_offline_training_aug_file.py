@@ -37,10 +37,8 @@ def main():
     
     os.makedirs(os.path.join(os.getenv('NAVSIM_EXP_ROOT'), 'offline_files/training_ego_aug_files'), exist_ok=True)
     filename_parts = []
-    if args.rot != 0 or args.trans != 0:
-        filename_parts.append(f'rot_{args.rot}-trans_{args.trans}')
-    if args.va != 0:
-        filename_parts.append(f'va_{args.va}')
+    filename_parts.append(f'rot_{args.rot}-trans_{args.trans}')
+    filename_parts.append(f'va_{int(args.va)}')
     filename_parts.append(f'p_{args.percentage}')
     filename_parts.append(f'seed_{args.seed}')
     filename = '-'.join(filename_parts) + '.json'
