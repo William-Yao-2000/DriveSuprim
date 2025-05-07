@@ -2,6 +2,7 @@
 epoch=$1
 dir=$2
 partition=$3
+agent=hydra_img_vit_ssl
 
 # Parse additional arguments
 # TODO: use dir to get these parameters
@@ -15,6 +16,9 @@ for arg in "${@:4}"; do
       ;;
     -topks=*)
       topks="${arg#*=}"
+      ;;
+    -agent=*)
+      agent="${arg#*=}"
       ;;
   esac
 done
@@ -34,7 +38,7 @@ submit_job \
     --dependent_clones 0 \
     --partition $partition \
     --account av_research \
-    -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash scripts/ssl/evaluation/eval_vit-multi_stage.sh $epoch $dir $num_refinement_stage $stage_layers $topks"
+    -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash scripts/ssl/evaluation/eval_vit-multi_stage.sh $epoch $dir $num_refinement_stage $stage_layers $topks $agent"
 
 
 : '
@@ -42,5 +46,5 @@ usage:
 bash scripts/slurm_bash/ssl/evaluation/eval_vit-multi_stage.sh \
     1 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256 \
     interactive_singlenode \
-    -num_refinement_stage=1 -stage_layers=3 -topks=256
+    -num_refinement_stage=1 -stage_layers=3 -topks=256 -agent=hydra_img_r34_ssl
 '
