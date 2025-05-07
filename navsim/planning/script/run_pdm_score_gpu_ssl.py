@@ -268,7 +268,7 @@ def main(cfg: DictConfig) -> None:
     import os
     pkl_path = os.getenv('SUBSCORE_PATH', None)
     pkl_name = Path(cfg.agent.checkpoint_path).name.split('.')[0] if pkl_path is None else pkl_path
-    pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{pkl_name}.pkl', 'wb'))
+    # pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{pkl_name}.pkl', 'wb'))
 
     data_points = [
         {
