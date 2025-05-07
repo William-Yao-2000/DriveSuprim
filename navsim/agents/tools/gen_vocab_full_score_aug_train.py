@@ -114,7 +114,7 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[D
     metric_cache_loader = MetricCacheLoader(Path(cfg.metric_cache_path))
     scene_filter: SceneFilter = instantiate(cfg.train_test_split.scene_filter)
     traffic_agents_policy: AbstractTrafficAgentsPolicy = instantiate(
-        cfg.traffic_agents_policy, simulator.proposal_sampling
+        cfg.traffic_agents_policy.non_reactive, simulator.proposal_sampling
     )
     scene_filter.log_names = log_names
     scene_filter.tokens = tokens
