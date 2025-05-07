@@ -230,7 +230,7 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_create_submission_pickle_w
 ## 2. training
 ### 0. generate offline augmentation file
 ```bash
-python navsim/agents/scripts/gen_offline_training_aug_file.py --rot=30 --trans=0 --va=0 --percentage=0.5 --seed=2025
+python navsim/agents/tools/gen_offline_training_aug_file.py --rot=45 --trans=0 --va=0 --percentage=1.0 --seed=2024
 ```
 参数：
     rot: 角度制
@@ -241,7 +241,7 @@ python navsim/agents/scripts/gen_offline_training_aug_file.py --rot=30 --trans=0
 
 ensemble offline files:
 ```bash
-python navsim/agents/scripts/gen_offline_training_aug_file_ensemble_seed.py --rot=30 --trans=0 --va=0 --percentage=0.5
+python navsim/agents/tools/gen_offline_training_aug_file_ensemble_seed.py --rot=45 --trans=0 --va=0 --percentage=1.0
 ```
 
 ### 1. metric caching (augmentation)
@@ -259,10 +259,10 @@ augmentation
 python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=navtrain \
     +debug=false \
     worker.threads_per_node=192 \
-    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/random_aug/rot_30-trans_0-va_0-p_0.5-seed_2026 \
-    aug_train.rotation=30 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/train/random_aug/rot_45-trans_0-va_0-p_1.0-seed_2026 \
+    aug_train.rotation=45 \
     aug_train.va=0 \
-    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-seed_2026.json \
+    offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_45-trans_0-va_0-p_1.0-seed_2026.json \
     --config-name metric_caching_aug_train
 ```
 
