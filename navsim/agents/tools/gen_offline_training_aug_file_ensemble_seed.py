@@ -14,7 +14,7 @@ def main():
     parser.add_argument('--percentage', default=0.5, type=float, help='the percentage of augmented data')
     args = parser.parse_args()
 
-    with open('navsim/planning/script/config/common/scene_filter/navtrain.yaml', 'r', encoding='utf-8') as f:
+    with open('navsim/planning/script/config/common/train_test_split/scene_filter/navtrain.yaml', 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
     import pdb; pdb.set_trace()
     tokens = data['tokens']
