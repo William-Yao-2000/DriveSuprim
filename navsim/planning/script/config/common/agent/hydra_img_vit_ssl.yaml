@@ -126,6 +126,7 @@ config:
     use_offset_refinement: false
     use_offset_refinement_v2: false
     use_separate_stage_heads: true
+    traj_expansion_in_infer: true
   
   inference:
     _target_: navsim.agents.hydra_ssl.hydra_config_ssl.InferConfig

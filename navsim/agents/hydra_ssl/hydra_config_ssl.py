@@ -91,14 +91,17 @@ class IbotConfig:
 class RefinementConfig:
     use_multi_stage: bool = False
     refinement_approach: str = "offset_decoder"
-    num_refinement_stage: int = 2
-    stage_layers: str = "3+3"
-    topks: str = "256+16"
+    num_refinement_stage: int = 1  # 2
+    stage_layers: str = "3"  # "3+3"
+    topks: str = "256"  # "256+64"
 
     use_mid_output: bool = True
     use_offset_refinement: bool = True  # abandoned
     use_offset_refinement_v2: bool = False
     use_separate_stage_heads: bool = True
+
+    traj_expansion_in_infer: bool = False
+    n_total_traj: int = 1024
 
 
 @dataclass

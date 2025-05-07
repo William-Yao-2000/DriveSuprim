@@ -1,8 +1,10 @@
 from typing import Dict, List
 import os, pickle
 import copy
+from itertools import combinations
 
 import numpy as np
+from sklearn.cluster import KMeans
 import torch
 import torch.nn as nn
 
@@ -379,6 +381,10 @@ class HydraTrajHead(nn.Module):
             _dict['coarse_score'] = {}
             for score_key in self.heads.keys():
                 _dict['coarse_score'][score_key] = result[score_key][batch_indices, topk_indices]
+            
+            if self._config.refinement.traj_expansion_in_infer and not self._config.training:
+                self.forward_refinement_infer_expansion(bev_feature, status_encoding, _dict)
+
             result['refinement'].append(_dict)
 
         # debug
@@ -390,6 +396,32 @@ class HydraTrajHead(nn.Module):
         
         return result
     
+    def forward_refinement_infer_expansion(self, bev_feature, status_encoding, dict_first_stage):
+        trajs = dict_first_stage['trajs']
+        n_total_traj = self._config.refinement.n_total_traj
+
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+        
+        interp_trajs = cluster_interp_tensor_batch(trajs, n_total_traj-trajs.shape[1])
+        B, L, HORIZON, _ = interp_trajs.shape
+        embedded_interb_vocab = self.pos_embed(interp_trajs.view(B, L, -1))
+        embedded_interb_vocab = self.encoder(embedded_interb_vocab)
+        tr_out_interb = self.transformer(embedded_interb_vocab, bev_feature)
+        
+        dist_status_interb = tr_out_interb + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
+        score_interb = {}
+        for k, head in self.heads.items():
+            score_interb[k] = head(dist_status_interb).squeeze(-1)
+        
+        dict_first_stage['trajs'] = torch.cat([dict_first_stage['trajs'], interp_trajs], dim=1)
+        dict_first_stage['trajs_status'] = torch.cat([dict_first_stage['trajs_status'], dist_status_interb], dim=1)
+        indices_absolute = dict_first_stage['indices_absolute']
+        indices_interb = torch.arange(self.vocab.shape[0], self.vocab.shape[0] + L).unsqueeze(0).expand(B, L).to(indices_absolute)
+        dict_first_stage['indices_absolute'] = torch.cat([indices_absolute, indices_interb], dim=1)
+        for k in self.heads.keys():
+            dict_first_stage['coarse_score'][k] = torch.cat([dict_first_stage['coarse_score'][k], score_interb[k]], dim=1)
+
 
 class TrajOffsetHead(nn.Module):
     def __init__(self, d_ffn: int, d_model: int, nhead: int, d_backbone: int,
@@ -679,3 +711,45 @@ def _inverse_sigmoid(x, eps=1e-5):
     x1 = x.clamp(min=eps)
     x2 = (1 - x).clamp(min=eps)
     return torch.log(x1/x2)
+
+
+def cluster_interp_tensor_batch(trajs_tensor, target_num=1024, alpha_list=[0.25, 0.5, 0.75]):
+    """
+    trajs_tensor: [bs, topk, 40, 3]
+    return: [bs, target_num, 40, 3]
+    """
+    assert trajs_tensor.ndim == 4 and trajs_tensor.shape[-2:] == (40, 3), "Input must be [bs, topk, 40, 3]"
+    bs, N, T, D = trajs_tensor.shape
+    device = trajs_tensor.device
+    result = []
+
+    n_clusters = int((target_num * 2 / len(alpha_list)) ** 0.5)+1
+
+    for b in range(bs):
+        trajs_np = trajs_tensor[b].cpu().numpy()  # [N, 40, 3]
+        flat = trajs_np.reshape(N, -1)
+
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat)
+        centers = torch.tensor(kmeans.cluster_centers_.reshape(n_clusters, T, D), dtype=trajs_tensor.dtype)
+
+        # 组合 (i, j)
+        pair_indices = list(combinations(range(n_clusters), 2))
+        pair_i = torch.tensor([i for i, j in pair_indices])
+        pair_j = torch.tensor([j for i, j in pair_indices])
+
+        interpolated = []
+        for alpha in alpha_list:
+            interp = (1 - alpha) * centers[pair_i] + alpha * centers[pair_j]  # [num_pairs, 40, 3]
+            interpolated.append(interp)
+
+        all_interp = torch.cat(interpolated, dim=0)  # [M, 40, 3]
+
+        if all_interp.shape[0] >= target_num:
+            final = all_interp[:target_num]
+        else:
+            repeat_factor = (target_num + all_interp.shape[0] - 1) // all_interp.shape[0]
+            final = all_interp.repeat((repeat_factor, 1, 1))[:target_num]
+
+        result.append(final)
+
+    return torch.stack(result, dim=0).to(device)  # [bs, target_num, 40, 3]
