@@ -56,10 +56,8 @@ def main(cfg: DictConfig) -> None:
     vocab = np.load(traj_path)
     # Extract scenes based on scene-loader to know which tokens to distribute across workers
     scene_loader = SceneLoader(
-        sensor_blobs_path=Path(cfg.sensor_blobs_path),
+        original_sensor_path=Path(cfg.original_sensor_path),
         data_path=Path(cfg.navsim_log_path),
-        synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
-        navsim_blobs_path=Path(cfg.navsim_blobs_path),
         scene_filter=instantiate(cfg.train_test_split.scene_filter),
         sensor_config=SensorConfig.build_no_sensors(),
     )
@@ -121,12 +119,10 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[D
     scene_filter.log_names = log_names
     scene_filter.tokens = tokens
     scene_loader = SceneLoader(
-        sensor_blobs_path=Path(cfg.sensor_blobs_path),
+        original_sensor_path=None,
         data_path=Path(cfg.navsim_log_path),
         scene_filter=scene_filter,
-        synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
         sensor_config=SensorConfig.build_no_sensors(),
-        navsim_blobs_path=Path(cfg.navsim_blobs_path),
     )
 
     tokens_to_evaluate = list(set(scene_loader.tokens) & set(metric_cache_loader.tokens))
