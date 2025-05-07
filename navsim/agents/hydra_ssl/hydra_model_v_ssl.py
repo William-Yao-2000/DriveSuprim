@@ -729,7 +729,7 @@ def cluster_interp_tensor_batch(trajs_tensor, target_num=1024, alpha_list=[0.25,
         trajs_np = trajs_tensor[b].cpu().numpy()  # [N, 40, 3]
         flat = trajs_np.reshape(N, -1)
 
-        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(flat)
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=5).fit(flat)
         centers = torch.tensor(kmeans.cluster_centers_.reshape(n_clusters, T, D), dtype=trajs_tensor.dtype)
 
         # 组合 (i, j)
