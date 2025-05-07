@@ -2,10 +2,10 @@
 scene_filter=$1
 seed=$2
 
-rot=30
+rot=45
 trans=0
 va=0
-percentage=0.5
+percentage=1.0
 
 
 export PROGRESS_MODE='gen_gt'  # IMPORTANT!!!
