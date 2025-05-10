@@ -162,8 +162,10 @@ class AgentLightningModuleSSL(pl.LightningModule):
         if self._cfg.lab.use_cosine_ema_scheduler:
             m = self.momentum_schedule[epoch]
         elif self._cfg.backbone_type in ('resnet34', 'resnet50'):
-            if epoch < 6:
-                m = 0.92 + epoch * 0.01
+            if epoch < 3:
+                m = 0.06
+            elif epoch < 6:
+                m = 0.92 + (m-3) * 0.02
             else:
                 m = 0.98
         else:
