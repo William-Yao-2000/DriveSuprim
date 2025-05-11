@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
-
-# 读取 pkl 文件
+# Load the pkl file
 with open('/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/dataset/traj_pdm_v2/ori/vocab_score_8192_navtrain/navtrain.pkl', 'rb') as f:
     data = pickle.load(f)
 
@@ -17,14 +16,14 @@ for key, value_dict in tqdm(data.items()):
     if 'pdm_score' in value_dict:
         pdm_scores = value_dict['pdm_score']
         if isinstance(pdm_scores, np.ndarray) and pdm_scores.shape == (8192,):
-            # 查找所有高于 0.98 的分数的索引
+            # Find indices where scores are greater than 0.98
             high_score_indices = np.where(pdm_scores > 0.98)[0]
 
             if high_score_indices.size > 0:
-                # 如果存在高于 0.98 的分数，则将 counter 对应位置加 1
+                # If any scores are greater than 0.98, increment corresponding counters
                 counter[high_score_indices] += 1
             else:
-                # 如果没有高于 0.98 的分数，则取前 3 高的索引
+                # If no scores exceed 0.98, take top 3 highest scoring indices
                 top_3_indices = np.argsort(pdm_scores)[-3:]
                 counter[top_3_indices] += 1
         else:
@@ -36,6 +35,6 @@ import pdb; pdb.set_trace()
 
 filename = 'temp-test-code/traj_counter_top3_ori.npy'
 np.save(filename, counter)
-print(f"Counter 已保存到文件: {filename}")
+print(f"Counter saved to file: {filename}")
 
 pass

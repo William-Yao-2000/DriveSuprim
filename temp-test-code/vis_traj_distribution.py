@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.colors import Normalize
 from matplotlib import cm
 
-# 假设 devkit_root 已经正确设置
+# Assume devkit_root is properly set
 devkit_root = os.getenv('NAVSIM_DEVKIT_ROOT')
 vocab_size = 8192
 traj_path = f"{devkit_root}/traj_final/test_{vocab_size}_kmeans.npy"
@@ -18,23 +18,23 @@ try:
     counter = np.load(counter_path)
     num_trajectories = vocab.shape[0]
 
-    # 确保 counter 的长度与轨迹数量一致
+    # Ensure the length of the counter matches the number of trajectories
     if counter.shape[0] != num_trajectories:
-        raise ValueError(f"轨迹数量 ({num_trajectories}) 与计数器长度 ({counter.shape[0]}) 不匹配。")
+        raise ValueError(f"Number of trajectories ({num_trajectories}) does not match counter length ({counter.shape[0]}).")
 
-    # 归一化 counter，得到 0 到 1 之间的权重
+    # Normalize the counter to get weights between 0 and 1
     norm = Normalize(vmin=counter.min(), vmax=counter.max())
-    cmap = cm.get_cmap('coolwarm')  # 使用 'coolwarm' 色图，蓝色到红色
+    cmap = cm.get_cmap('coolwarm')  # Use 'coolwarm' colormap (blue to red)
 
     plt.figure(figsize=(10, 10))
     for i in range(num_trajectories):
         trajectory = vocab[i]
         x = trajectory[:, 0]
         y = trajectory[:, 1]
-        color = cmap(norm(counter[i]) ** 0.7)  # 根据权重获取颜色
+        color = cmap(norm(counter[i]) ** 0.7)  # Get color based on weight
         plt.plot(x, y, linewidth=0.5, color=color)
 
-    # 添加颜色条
+    # Add color bar
     cbar = plt.colorbar(
         plt.cm.ScalarMappable(cmap=cmap),
         ax=plt.gca()
@@ -44,18 +44,18 @@ try:
     plt.ylabel("Y")
     plt.title(f"Visualization of {num_trajectories} Trajectories in XY Plane (Colored by Frequency)")
     plt.grid(True)
-    plt.gca().set_aspect('equal', adjustable='box') # 确保 x 和 y 轴的比例一致
+    plt.gca().set_aspect('equal', adjustable='box')  # Ensure equal aspect ratio for x and y axes
 
-    # 保存图形
+    # Save the plot
     os.makedirs("temp-test-code", exist_ok=True)
     plt.savefig("temp-test-code/trajectories_colored.png")
 
-    # 显示图形
+    # Show the plot
     plt.show()
 
 except FileNotFoundError as e:
-    print(f"错误：文件未找到，路径为 {e.filename}。请检查路径是否正确。")
+    print(f"Error: File not found at {e.filename}. Please check the path.")
 except ValueError as e:
-    print(f"数值错误：{e}")
+    print(f"ValueError: {e}")
 except Exception as e:
-    print(f"发生了一个错误：{e}")
+    print(f"An unexpected error occurred: {e}")
