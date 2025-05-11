@@ -24,6 +24,8 @@ config:
 
   normalize_vocab_pos: True
 
+  vadv2_head_nlayers: 3
+
   n_camera: 3
 
   camera_width: 1024
