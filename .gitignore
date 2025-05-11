@@ -47,4 +47,6 @@ debug/
 # IDE
 
 
-temp-test-code
+temp-test-code/*
+!temp-test-code/save_traj_weight.py
+!temp-test-code/vis_traj_distribution.py
