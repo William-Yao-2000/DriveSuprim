@@ -50,3 +50,4 @@ debug/
 temp-test-code/*
 !temp-test-code/save_traj_weight.py
 !temp-test-code/vis_traj_distribution.py
+!temp-test-code/traj_counter_top3_rotated.npy
