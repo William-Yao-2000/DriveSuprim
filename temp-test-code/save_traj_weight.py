@@ -3,9 +3,10 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+import sys
 
-# Load the pkl file
-seed = 2024
+# Use first command line argument as seed
+seed = int(sys.argv[1])
 with open(f'/workspace/navtrain-vis-{seed}.pkl', 'rb') as f:
     data = pickle.load(f)
 
