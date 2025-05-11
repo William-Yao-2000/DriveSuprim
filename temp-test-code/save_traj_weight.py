@@ -5,7 +5,8 @@ import numpy as np
 from tqdm import tqdm
 
 # Load the pkl file
-with open('/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/dataset/traj_pdm_v2/ori/vocab_score_8192_navtrain/navtrain.pkl', 'rb') as f:
+seed = 2024
+with open(f'/workspace/navtrain-vis-{seed}.pkl', 'rb') as f:
     data = pickle.load(f)
 
 import pdb; pdb.set_trace()
@@ -33,7 +34,7 @@ for key, value_dict in tqdm(data.items()):
 
 import pdb; pdb.set_trace()
 
-filename = 'temp-test-code/traj_counter_top3_ori.npy'
+filename = f'temp-test-code/traj_counter_top3_rotated-{seed}.npy'
 np.save(filename, counter)
 print(f"Counter saved to file: {filename}")
 
