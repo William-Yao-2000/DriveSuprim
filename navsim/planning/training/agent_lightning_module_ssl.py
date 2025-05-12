@@ -163,10 +163,10 @@ class AgentLightningModuleSSL(pl.LightningModule):
         #     m = self.momentum_schedule[epoch]
 
         if self._cfg.backbone_type in ('resnet34', 'resnet50'):
-            if epoch <= 3:
+            if epoch < 3:
                 m = 0
-            elif epoch <= 7:
-                m = 0.992 + (epoch-4) * 0.002
+            elif epoch < 6:
+                m = 0.992 + (epoch-3) * 0.002
             else:
                 m = 0.998
         else:
