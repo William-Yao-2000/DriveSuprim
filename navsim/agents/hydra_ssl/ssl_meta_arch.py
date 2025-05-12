@@ -253,7 +253,7 @@ class SSLMetaArch(nn.Module):
             for k in self.student.keys():
                 for stu_params, tea_params in zip(self.student[k].parameters(), self.teacher[k].parameters()):
                     tea_params.data.mul_(m).add_(stu_params.data, alpha=1 - m)
-                if self.cfg.backbone_type in ('resnet34', 'resnet50'):
+                if self.cfg.backbone_type in ('resnet34', 'resnet50') or self.cfg.lab.update_buffer_in_ema:
                     # update buffers (e.g., running_mean/var in BatchNorm)
                     for stu_buf, tea_buf in zip(self.student[k].buffers(), self.teacher[k].buffers()):
                         tea_buf.data.copy_(stu_buf.data)
