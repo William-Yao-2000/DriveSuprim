@@ -159,20 +159,22 @@ class AgentLightningModuleSSL(pl.LightningModule):
         optimizer.step(closure=optimizer_closure)
         if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
             import pdb; pdb.set_trace()
-        if self._cfg.lab.use_cosine_ema_scheduler:
-            m = self.momentum_schedule[epoch]
-        elif self._cfg.backbone_type in ('resnet34', 'resnet50'):
-            if epoch < 3:
-                m = 0.06
-            elif epoch < 6:
-                m = 0.92 + (epoch-3) * 0.02
+        # if self._cfg.lab.use_cosine_ema_scheduler:
+        #     m = self.momentum_schedule[epoch]
+        
+        if self._cfg.backbone_type in ('resnet34', 'resnet50'):
+            if epoch <= 3:
+                m = 0
+            elif epoch <= 7:
+                m = 0.992 + (epoch-4) * 0.002
             else:
-                m = 0.98
+                m = 0.998
         else:
             if epoch < 3:
                 m = 0.992 + epoch * 0.002
             else:
                 m = 0.998
+        self.log("momemtum: ", m)
         self.agent.model.update_teacher(m)
     
 
