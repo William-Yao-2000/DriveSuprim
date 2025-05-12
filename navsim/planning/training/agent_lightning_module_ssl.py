@@ -161,7 +161,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
             import pdb; pdb.set_trace()
         # if self._cfg.lab.use_cosine_ema_scheduler:
         #     m = self.momentum_schedule[epoch]
-        
+
         if self._cfg.backbone_type in ('resnet34', 'resnet50'):
             if epoch <= 3:
                 m = 0
@@ -174,7 +174,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
                 m = 0.992 + epoch * 0.002
             else:
                 m = 0.998
-        self.log("momemtum: ", m)
         self.agent.model.update_teacher(m)
     
 
