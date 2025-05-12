@@ -121,8 +121,8 @@ def hydra_kd_imi_agent_loss_single_stage(
     :return: combined loss value
     """
 
-    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        import pdb; pdb.set_trace()
+    # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+    #     import pdb; pdb.set_trace()
     
     layer_results = predictions['layer_results']
     losses = {}

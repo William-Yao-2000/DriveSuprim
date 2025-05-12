@@ -151,8 +151,8 @@ class HydraBackbonePE(nn.Module):
         return self.avgpool_img(image_features)
 
     def forward_tup(self, image, **kwargs):
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         if isinstance(self.image_encoder, DAViT):
             image_feat_tup = self.image_encoder(image, **kwargs)[-1]

@@ -173,8 +173,8 @@ class HydraAgentSSL(AbstractAgent):
             predictions: List[Dict[str, torch.Tensor]],
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         # get the pdm score by tokens
 
         # ori
@@ -221,8 +221,8 @@ class HydraAgentSSL(AbstractAgent):
             targets,
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         # get the pdm score by tokens
 
         sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]
@@ -288,8 +288,8 @@ class HydraAgentSSL(AbstractAgent):
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         _refinement_metrics = self.metrics
         if self._config.lab.refinement_metrics == 'dac_ep_lk_pdms':

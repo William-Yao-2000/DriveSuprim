@@ -105,8 +105,8 @@ class HydraModel(nn.Module):
                 interpolated_traj=None,
                 tokens=None) -> Dict[str, torch.Tensor]:
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         
         output: Dict[str, torch.Tensor] = {}
 
@@ -592,8 +592,8 @@ class TrajOffsetHead(nn.Module):
         # status_encoding: bs, topk, c
         # coarse_scores: dict
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
         B = bev_feat_fg.shape[0]
         
