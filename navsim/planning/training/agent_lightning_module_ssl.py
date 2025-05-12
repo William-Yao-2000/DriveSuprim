@@ -165,7 +165,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
             if epoch < 3:
                 m = 0.06
             elif epoch < 6:
-                m = 0.92 + (m-3) * 0.02
+                m = 0.92 + (epoch-3) * 0.02
             else:
                 m = 0.98
         else:
