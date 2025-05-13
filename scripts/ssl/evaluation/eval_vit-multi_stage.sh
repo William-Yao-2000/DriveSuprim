@@ -7,7 +7,7 @@ num_refinement_stage=$3
 stage_layers=$4
 topks=$5
 agent=${6:-"hydra_img_vit_ssl"}
-inference_model=${7:-"student"}
+inference_model=${7:-"teacher"}
 use_first_stage_traj_in_infer=${8:-"false"}
 
 
