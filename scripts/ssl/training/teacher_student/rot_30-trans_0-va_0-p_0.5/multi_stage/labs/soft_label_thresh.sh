@@ -1,7 +1,7 @@
 agent="hydra_img_vit_ssl"
 bs=8
 lr=0.000075
-epoch=20
+epoch=8
 config="competition_training"
 rot=30
 trans=0
@@ -39,7 +39,6 @@ command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_s
     agent.config.refinement.num_refinement_stage=$num_refinement_stage \
     agent.config.refinement.stage_layers=$stage_layers \
     agent.config.refinement.topks=$topks \
-    agent.config.lab.use_imi_learning_in_refinement=true \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_final/navtrain.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_$rot-trans_$trans-va_$va-p_$probability-ensemble/split_pickles \
     cache_path=null
