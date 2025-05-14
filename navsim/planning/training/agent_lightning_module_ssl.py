@@ -328,7 +328,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
              driving_direction_compliance,
              lane_keeping,
              traffic_light_compliance,
-             filtered_traj,
+            #  filtered_traj,
              token) in \
                 zip(poses,
                     imis,
@@ -339,7 +339,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
                     driving_direction_compliance_all,
                     lane_keeping_all,
                     traffic_light_compliance_all,
-                    filtered_trajs_all,
+                    # filtered_trajs_all,
                     tokens):
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
@@ -351,6 +351,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
                 'driving_direction_compliance': driving_direction_compliance,
                 'lane_keeping': lane_keeping,
                 'traffic_light_compliance': traffic_light_compliance,
-                'filtered_traj': filtered_traj[:16],
+                # 'filtered_traj': filtered_traj[:16],
             }
         return result
