@@ -7,7 +7,7 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training.py \
     ~trainer.params.strategy \
     trainer.params.limit_val_batches=0.2 \
     train_test_split=$TRAIN_TEST_SPLIT \
-    +resume_ckpt_path="${NAVSIM_EXP_ROOT}/training/transfuser_agent/epoch\=23-step\=4008.ckpt"
+    +resume_ckpt_path="${NAVSIM_EXP_ROOT}/training/transfuser_agent/epoch\=23-step\=4008.ckpt" \
     cache_path=null
 
 
