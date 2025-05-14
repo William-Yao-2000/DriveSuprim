@@ -152,6 +152,7 @@ config:
     use_cosine_ema_scheduler: false
     ema_momentum_start: 0.99
     update_buffer_in_ema: false
+    save_pickle: false
 
 
 checkpoint_path: null

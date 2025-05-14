@@ -123,6 +123,7 @@ class LabConfig:
     use_cosine_ema_scheduler: bool = False
     ema_momentum_start: float = 0.99
     update_buffer_in_ema: bool = False
+    save_pickle: bool = False
 
 
 @dataclass

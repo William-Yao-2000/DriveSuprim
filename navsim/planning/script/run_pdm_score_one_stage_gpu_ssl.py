@@ -6,6 +6,7 @@ from dataclasses import fields
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
+import pickle
 
 import hydra
 import numpy as np
@@ -310,7 +311,8 @@ def main(cfg: DictConfig) -> None:
 
     agent_ckpt_path = Path(cfg.agent.checkpoint_path).parent.absolute().__str__()
     ckpt_name = Path(cfg.agent.checkpoint_path).name.split('.')[0]
-    # pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{ckpt_name}.pkl', 'wb'))
+    if cfg.agent.config.lab.save_pickle:
+        pickle.dump(merged_predictions, open(f'{agent_ckpt_path}/{ckpt_name}.pkl', 'wb'))
     
     data_points = [
         {
