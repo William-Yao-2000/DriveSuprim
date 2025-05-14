@@ -42,6 +42,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_gpu.py \
     scene_filter=navtest
 ```
 
+
 debug
 ```bash
 TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
@@ -57,64 +58,12 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl.py \
     dataloader.params.prefetch_factor=null \
     agent.config.training=false \
     agent.config.only_ori_input=true \
-    agent.config.inference.model=student \
-    agent.config.refinement.use_multi_stage=true \
-    agent.checkpoint_path='/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/ensemble_3-lr3x/epoch\=01-step\=2660.ckpt' \
-    experiment_name=debug \
-    +cache_path=null \
-    metric_cache_path=/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp/metric_cache/test/ori \
-    train_test_split=navtest
-```
-
-temp debug
-```bash
-TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
-python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_debug.py \
-    +debug=true \
-    +use_pdm_closed=false \
-    agent=hydra_img_vit_ssl \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    dataloader.params.batch_size=2 \
-    dataloader.params.num_workers=0 \
-    dataloader.params.pin_memory=false \
-    dataloader.params.prefetch_factor=null \
-    agent.config.training=false \
-    agent.config.only_ori_input=true \
-    agent.config.inference.model=teacher \
-    agent.config.refinement.use_multi_stage=true \
-    agent.config.refinement.num_refinement_stage=2 \
-    agent.config.refinement.stage_layers=3+3 \
-    agent.config.refinement.topks=256+64 \
-    agent.config.lab.use_first_stage_traj_in_infer=false \
-    experiment_name=debug \
-    +cache_path=null \
-    metric_cache_path=/DATA3/yaowenhao/proj/auto_drive/navsim_workspace/exp_v2/metric_cache/warmup_two_stage \
-    train_test_split=warmup_two_stage
-```
-
-
-debug (v1)
-```bash
-TORCH_NCCL_ENABLE_MONITORING=0 CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
-python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_pdm_score_gpu_ssl_v1.py \
-    +debug=true \
-    +use_pdm_closed=false \
-    agent=hydra_img_vit_ssl_v1 \
-    worker.threads_per_node=0 \
-    worker.debug_mode=true \
-    dataloader.params.batch_size=2 \
-    dataloader.params.num_workers=0 \
-    dataloader.params.pin_memory=false \
-    dataloader.params.prefetch_factor=null \
-    agent.config.training=false \
-    agent.config.only_ori_input=true \
     agent.config.inference.model=teacher \
     agent.config.refinement.use_multi_stage=true \
     agent.config.refinement.num_refinement_stage=1 \
     agent.config.refinement.stage_layers=3 \
     agent.config.refinement.topks=256 \
-    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage_v1/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
+    agent.checkpoint_path="${NAVSIM_EXP_ROOT}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256/epoch\=05-step\=7980.ckpt" \
     experiment_name=debug \
     +cache_path=null \
     metric_cache_path=${NAVSIM_EXP_ROOT}/metric_cache/test/ori \
@@ -284,7 +233,7 @@ python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=n
 
 bash command (subset score generation)
 ```bash
-bash scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_ngc_sub1 2024
+bash scripts/ssl/gen_full_score_aug/gen_training_full_score_aug_subset-seeds.sh navtrain_ngc_sub12 2026
 ```
 
 
@@ -359,14 +308,14 @@ python navsim/agents/tools/gen_vocab_full_score.py train_test_split=navtrain_deb
 
 **ensemble**
 ```bash
-python navsim/agents/tools/get_final_full_vocab_score.py --rot=30 --trans=0 --va=0 --percentage=0.5 --seed=2024
+python navsim/agents/tools/get_final_full_vocab_score.py --rot=45 --trans=0 --va=0 --percentage=1.0 --seed=2026
 
-python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=30 --trans=0 --va=0 --percentage=0.5
+python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=45 --trans=0 --va=0 --percentage=1.0
 ```
 
 **split emsembles**
 ```bash
-python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --trans=0 --va=0 --percentage=0.5
+python navsim/agents/tools/split_final_ensemble_pickle.py --rot=45 --trans=0 --va=0 --percentage=1.0
 ```
 
 
@@ -416,17 +365,17 @@ debug (只是为了测试，有可能参数之间并没有相符/对齐)
 teacher + student, ori input + rotate input (3-ensemble)
 其实跟上面没什么变化，只是代码变了
 ```bash
-CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+CUDA_VISIBLE_DEVICES=1 HYDRA_FULL_ERROR=1 \
 python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=true \
-    agent=hydra_img_vit_ssl \
+    agent=hydra_img_r34_ssl \
     experiment_name=debug \
     split=trainval \
     train_test_split=navtrain_debug \
     \~trainer.params.strategy \
     trainer.params.limit_train_batches=0.08 \
     trainer.params.limit_val_batches=0.20 \
-    dataloader.params.batch_size=2 \
+    dataloader.params.batch_size=1 \
     dataloader.params.num_workers=0 \
     dataloader.params.pin_memory=false \
     dataloader.params.prefetch_factor=null \
@@ -476,14 +425,12 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
 ## 3. visualization
 
 ```bash
-python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest_robust_aug.py \
-    +debug=true \
+python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest-multi_stage.py \
+    +debug=false \
     worker=ray_distributed_no_torch \
     worker.threads_per_node=64 \
     experiment_name=debug \
-    split=test \
-    scene_filter=navtest_aug_select \
-    +offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/testing_aug_files/rot_45-trans_0-va_0.5-wp_0.3-p_1.0.json \
+    train_test_split=navtest_vis \
     +start_idx=0 \
     +end_idx=200
 ```
@@ -491,15 +438,13 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest_robust_aug.py \
 
 debug
 ```bash
-python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest_robust.py \
+python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest.py \
     +debug=true \
     worker=ray_distributed_no_torch \
     worker.threads_per_node=0 \
     worker.debug_mode=true \
     experiment_name=debug \
-    split=test \
-    scene_filter=navtest_aug_select \
-    +offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/testing_aug_files/rot_45-trans_0-va_0.5-wp_0.3-p_1.0.json \
+    train_test_split=navtest \
     +start_idx=0 \
     +end_idx=1000
 ```
