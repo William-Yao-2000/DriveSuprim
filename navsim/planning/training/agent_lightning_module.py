@@ -95,12 +95,40 @@ class AgentLightningModule(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
-        if isinstance(self.agent, HydraPlusAgent):
+        if isinstance(self.agent, TransfuserAgent):
+            return self.predict_step_transfuser(batch, batch_idx)
+        elif isinstance(self.agent, HydraPlusAgent):
             return self.predict_step_hydra(batch, batch_idx)
         elif isinstance(self.agent, DPAgent):
             return self.predict_step_dp(batch, batch_idx)
         else:
             raise ValueError('unsupported agent')
+
+    # ablate overall pdm score
+    def predict_step_transfuser(
+            self,
+            batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
+            batch_idx: int
+    ):
+        features, targets, tokens = batch
+        self.agent.eval()
+        with torch.no_grad():
+            predictions = self.agent.forward(features)
+            poses = predictions["trajectory"].cpu().numpy()
+            if 'trajectory_pre' in predictions:
+                poses_pre = predictions["trajectory_pre"].cpu().numpy()
+            else:
+                poses_pre = poses
+
+        if poses.shape[1] == 40:
+            interval_length = 0.1
+        else:
+            interval_length = 0.5
+
+        return {token: {
+            'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
+            'trajectory_pre': Trajectory(pose_pre, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
+        } for pose, pose_pre, token in zip(poses, poses_pre, tokens)}
 
     def predict_step_dp(
             self,
