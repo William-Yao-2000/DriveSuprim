@@ -20,13 +20,13 @@ do
         --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
         --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
         --email_mode never \
-        --duration 3.2 \
+        --duration 3.4 \
         --dependent_clones 0 \
         --partition $partition \
         --account av_research \
         -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash $bash_file $agent $num_refinement_stage $stage_layers $topks $epoch"
     
-    sleep 3.5h
+    sleep 3.4h
 done
 
 
@@ -34,6 +34,6 @@ done
 usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/multi_stage-other_backbone-resume_1ep.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone-resume.sh \
-    hydra_img_sptr_ssl 1 3 256 \
+    hydra_img_r34_ssl 1 3 256 \
     interactive
 '
