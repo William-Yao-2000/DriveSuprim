@@ -316,7 +316,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
         if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
             import pdb; pdb.set_trace()
 
-        filtered_trajs_all = predictions['refinement'][0]['trajs']
+        # filtered_trajs_all = predictions['refinement'][0]['trajs']
 
         result = {}
         for (pose,
