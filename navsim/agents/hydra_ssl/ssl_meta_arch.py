@@ -258,15 +258,15 @@ class SSLMetaArch(nn.Module):
                     for stu_buf, tea_buf in zip(self.student[k].buffers(), self.teacher[k].buffers()):
                         tea_buf.data.copy_(stu_buf.data)
                 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
-            for k, v in self.teacher.model.state_dict().items():
-                v2 = self.student.model.state_dict().get(k)
-                if v2 is None:
-                    print(f"{k} only in teacher")
-                elif not torch.equal(v, v2):
-                    print(f"{k} differs")
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+        #     for k, v in self.teacher.model.state_dict().items():
+        #         v2 = self.student.model.state_dict().get(k)
+        #         if v2 is None:
+        #             print(f"{k} only in teacher")
+        #         elif not torch.equal(v, v2):
+        #             print(f"{k} differs")
+        #     import pdb; pdb.set_trace()
 
     def train(self, mode=True):
         if mode:
