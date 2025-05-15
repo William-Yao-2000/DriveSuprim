@@ -1,0 +1,4 @@
+defaults:
+  - scene_filter: navtest_angle_split_0
+
+data_split: test
