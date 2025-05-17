@@ -5,7 +5,7 @@ epoch=${1:-19}
 dir=${2:-"training/ssl/ori/lr_baseline"}
 agent=${3:-"hydra_img_vit_ssl"}
 
-inference_model="teacher"
+inference_model=$4
 
 # Format epoch with leading zero
 padded_epoch=$(printf "%02d" $epoch)
