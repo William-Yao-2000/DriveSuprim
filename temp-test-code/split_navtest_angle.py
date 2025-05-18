@@ -124,15 +124,12 @@ def main(cfg: DictConfig) -> None:
     worker = build_worker(cfg)
     results = worker_map(worker, worker_task, data_points)
     
-    import pdb; pdb.set_trace()
-
-    # 合并所有 worker 的返回结果
     public_dict = defaultdict(list)
     for partial_dict in results:
         for k, v in partial_dict.items():
             public_dict[v].append(k)
 
-    # 保存
+    import pdb; pdb.set_trace()
     output_path = 'temp-test-code/token_angle_categories.json'
     with open(output_path, 'w') as f:
         json.dump(public_dict, f, indent=2)
