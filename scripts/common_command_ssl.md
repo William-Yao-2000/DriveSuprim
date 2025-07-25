@@ -368,7 +368,7 @@ teacher + student, ori input + rotate input (3-ensemble)
 CUDA_VISIBLE_DEVICES=1 HYDRA_FULL_ERROR=1 \
 python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=true \
-    agent=hydra_img_r34_ssl \
+    agent=hydra_img_vit_ssl \
     experiment_name=debug \
     split=trainval \
     train_test_split=navtrain_debug \
@@ -424,6 +424,21 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
 
 ## 3. visualization
 
+
+single_stage
+```bash
+python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest-single_stage.py \
+    +debug=false \
+    worker=ray_distributed_no_torch \
+    worker.threads_per_node=64 \
+    experiment_name=debug \
+    train_test_split=navtest_vis \
+    +start_idx=0 \
+    +end_idx=200
+```
+
+
+multi_stage
 ```bash
 python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest-multi_stage.py \
     +debug=false \
@@ -438,13 +453,39 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest-multi_stage.py \
 
 debug
 ```bash
-python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest.py \
+python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/navtest-multi_stage.py \
     +debug=true \
     worker=ray_distributed_no_torch \
     worker.threads_per_node=0 \
     worker.debug_mode=true \
     experiment_name=debug \
-    train_test_split=navtest \
+    train_test_split=navtest_vis \
+    +start_idx=0 \
+    +end_idx=1000
+```
+
+
+split navtest angle:
+```bash
+python ${NAVSIM_DEVKIT_ROOT}/temp-test-code/split_navtest_angle.py \
+    +debug=false \
+    worker=ray_distributed_no_torch \
+    worker.threads_per_node=192 \
+    experiment_name=debug \
+    train_test_split=navtrain
+```
+
+
+compare pred score with gt score:
+debug
+```bash
+python ${NAVSIM_DEVKIT_ROOT}/navsim/visualization/score_comparison.py \
+    +debug=true \
+    worker=ray_distributed_no_torch \
+    worker.threads_per_node=0 \
+    worker.debug_mode=true \
+    experiment_name=debug \
+    train_test_split=navtest_vis_1 \
     +start_idx=0 \
     +end_idx=1000
 ```

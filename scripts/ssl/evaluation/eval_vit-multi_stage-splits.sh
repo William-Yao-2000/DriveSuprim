@@ -64,6 +64,6 @@ eval $command_string
 : '
 usage:
 bash scripts/ssl/evaluation/eval_vit-multi_stage-splits.sh \
-    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256 \
-    navtest_angle_split_0
+    6 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/stage_layers_3-topks_256-only_ori_input \
+    navtest_angle_split_1
 '

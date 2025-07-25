@@ -97,17 +97,7 @@ def main(cfg: DictConfig) -> None:
         data_path=Path(cfg.navsim_log_path),
         synthetic_scenes_path=Path(cfg.synthetic_scenes_path),
         scene_filter=scene_filter,
-        sensor_config=SensorConfig(
-            cam_f0=True,
-            cam_l0=True,
-            cam_l1=True,
-            cam_l2=True,
-            cam_r0=True,
-            cam_r1=True,
-            cam_r2=True,
-            cam_b0=True,
-            lidar_pc=False,
-        )
+        sensor_config=SensorConfig.build_no_sensors(),
     )
 
 

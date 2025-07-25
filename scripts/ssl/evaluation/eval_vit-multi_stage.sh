@@ -50,7 +50,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
-    train_test_split=navtest \
+    train_test_split=navtest_vis_1 \
 "
 
 echo "--- COMMAND ---"
@@ -63,6 +63,6 @@ eval $command_string
 : '
 usage:
 bash scripts/ssl/evaluation/eval_vit-multi_stage.sh \
-    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_1024 \
-    1 3 1024
+    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256 \
+    1 3 256
 '
