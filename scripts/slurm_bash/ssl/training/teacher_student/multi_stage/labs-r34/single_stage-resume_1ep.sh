@@ -4,7 +4,7 @@ partition=$2
 
 dir_name=$(echo $bash_file-multi_stage_lab-r34-single_stage | tr '/' '-' | tr '.' 'dot')
 
-for epoch in $(seq 0 1 10)
+for epoch in $(seq 5 1 10)
 do
     echo $epoch
     submit_job \
@@ -15,20 +15,20 @@ do
         --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
         --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
         --email_mode never \
-        --duration 4 \
+        --duration 3.1 \
         --dependent_clones 0 \
         --partition $partition \
         --account av_research \
         -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash $bash_file $epoch"
 
-    sleep 4h
+    sleep 3.2h
 
 done
 
 
 : '
 usage:
-bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs-r34/single_stage_1ep.sh \
+bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs-r34/single_stage-resume_1ep.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/single_stage-resume.sh \
     interactive_singlenode
 '

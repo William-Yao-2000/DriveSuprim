@@ -43,5 +43,5 @@ usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs-r34/ori_input-soft_label_loss.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/ori_input-soft_label_loss.sh \
     interactive \
-    -only_ori_input=true -ban_soft_label_loss=false
+    -only_ori_input=false -ban_soft_label_loss=true
 '
