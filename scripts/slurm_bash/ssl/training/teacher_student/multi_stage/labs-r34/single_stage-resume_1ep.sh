@@ -15,13 +15,13 @@ do
         --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
         --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
         --email_mode never \
-        --duration 3.1 \
+        --duration 3 \
         --dependent_clones 0 \
         --partition $partition \
         --account av_research \
         -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash $bash_file $epoch"
 
-    sleep 3.2h
+    sleep 2.8h
 
 done
 
