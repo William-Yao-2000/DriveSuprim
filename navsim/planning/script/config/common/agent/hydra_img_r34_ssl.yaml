@@ -23,6 +23,8 @@ config:
   progress_weight: 2.0
 
   normalize_vocab_pos: True
+  
+  vadv2_head_nlayers: 3
 
   n_camera: 3
 
