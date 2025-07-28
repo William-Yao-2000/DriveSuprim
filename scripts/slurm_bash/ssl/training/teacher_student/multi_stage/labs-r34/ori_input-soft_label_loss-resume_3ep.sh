@@ -23,7 +23,7 @@ if [ "$ban_soft_label_loss" = "true" ]; then
     dir_name="$dir_name-ban_soft_label_loss"
 fi
 
-for epoch in $(seq 2 3 10)
+for epoch in $(seq 9 3 11)
 do
     echo $epoch
     submit_job \
