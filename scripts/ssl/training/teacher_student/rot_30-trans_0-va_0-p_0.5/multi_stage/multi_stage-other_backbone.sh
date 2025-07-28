@@ -1,6 +1,6 @@
 bs=8
 lr=0.000075
-epoch=8
+epoch=12
 config="competition_training"
 rot=30
 trans=0
@@ -50,6 +50,6 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone-general.sh \
-  hydra_img_r50_ssl 1 3 256
+bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone.sh \
+  hydra_img_r34_ssl 1 1 256
 '

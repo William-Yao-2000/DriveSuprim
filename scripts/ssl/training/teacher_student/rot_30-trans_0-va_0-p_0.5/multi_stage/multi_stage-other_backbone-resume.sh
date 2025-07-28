@@ -1,6 +1,6 @@
 bs=8
 lr=0.000075
-epoch=16
+epoch=12
 config="competition_training"
 rot=30
 trans=0
