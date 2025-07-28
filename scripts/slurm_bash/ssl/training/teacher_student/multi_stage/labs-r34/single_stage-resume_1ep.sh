@@ -4,7 +4,7 @@ partition=$2
 
 dir_name=$(echo $bash_file-multi_stage_lab-r34-single_stage | tr '/' '-' | tr '.' 'dot')
 
-for epoch in $(seq 5 1 10)
+for epoch in $(seq 7 1 10)
 do
     echo $epoch
     submit_job \
