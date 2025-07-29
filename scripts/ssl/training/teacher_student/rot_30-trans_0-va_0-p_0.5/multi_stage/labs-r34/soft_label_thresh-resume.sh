@@ -65,3 +65,9 @@ echo $command_string
 echo "\n\n"
 
 eval $command_string
+
+
+: 'usage:
+bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/soft_label_thresh-resume.sh \
+  0.7 0
+'
