@@ -60,3 +60,9 @@ echo $command_string
 echo "\n\n"
 
 eval $command_string
+
+
+: '
+help: if $only_ori_input and $ban_soft_label_loss are both true, then the training will only use original input and ban soft label loss.
+  then you need to use the student model to evaluate the performance.
+'
