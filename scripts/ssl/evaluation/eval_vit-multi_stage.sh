@@ -46,7 +46,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     agent.config.refinement.stage_layers=$stage_layers \
     agent.config.refinement.topks=$topks \
     agent.config.lab.use_first_stage_traj_in_infer=false \
-    agent.config.lab.save_pickle=true \
+    agent.config.lab.save_pickle=false \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
