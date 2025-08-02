@@ -53,5 +53,4 @@ eval $command_string
 
 : '
 note: use student model to evaluate the performance.
-
 '

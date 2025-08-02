@@ -12,7 +12,7 @@ num_refinement_stage=1
 stage_layers=3
 topks=256
 
-dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs-r34/stage_layers_$stage_layers-topks_$topks-ban_soft_label_loss-use_temperature_bce
+dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs-r34/stage_layers_$stage_layers-topks_$topks-ban_soft_label_loss-use_label_smoothing
 
 
 command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
@@ -51,6 +51,5 @@ eval $command_string
 
 
 : '
-help: if $only_ori_input and $ban_soft_label_loss are both true, then the training will only use original input and ban soft label loss.
-  then you need to use the student model to evaluate the performance.
+note: use student model to evaluate the performance.
 '
