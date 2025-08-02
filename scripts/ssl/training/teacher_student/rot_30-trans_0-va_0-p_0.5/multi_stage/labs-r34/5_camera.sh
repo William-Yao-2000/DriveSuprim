@@ -1,4 +1,4 @@
-agent="hydra_img_vr34_ssl"
+agent="hydra_img_r34_ssl"
 bs=8
 lr=0.000075
 epoch=8
