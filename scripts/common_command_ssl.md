@@ -319,6 +319,19 @@ python navsim/agents/tools/split_final_ensemble_pickle.py --rot=45 --trans=0 --v
 ```
 
 
+ori-test
+```bash
+export PROGRESS_MODE=gen_gt; \
+python navsim/agents/tools/gen_vocab_full_score.py train_test_split=navtest \
+    +debug=false \
+    +vocab_size=8192 \
+    +scene_filter_name=navtest \
+    experiment_name=full_vocab_pdm_scoring_aug/ori/navtest \
+    worker.threads_per_node=128 \
+    metric_cache_path=$NAVSIM_EXP_ROOT/metric_cache/test/ori
+```
+
+
 ### 3. get close pdm traj from metric caching
 
 由于 cache（第一步）的时候没有分子集，而是全部一起 cache 的，因此这里也可以直接整个集合一起做 get close pdm traj，不用分集合
@@ -368,7 +381,7 @@ teacher + student, ori input + rotate input (3-ensemble)
 CUDA_VISIBLE_DEVICES=1 HYDRA_FULL_ERROR=1 \
 python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=true \
-    agent=hydra_img_vit_ssl \
+    agent=hydra_img_r34_ssl \
     experiment_name=debug \
     split=trainval \
     train_test_split=navtrain_debug \
@@ -385,9 +398,11 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
     agent.config.student_rotation_ensemble=3 \
     agent.config.refinement.use_multi_stage=true \
-    agent.config.refinement.num_refinement_stage=2 \
-    agent.config.refinement.stage_layers=3+3 \
-    agent.config.refinement.topks=128+64 \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.config.lab.ban_soft_label_loss=True \
+    agent.config.lab.use_label_smoothing=True \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null

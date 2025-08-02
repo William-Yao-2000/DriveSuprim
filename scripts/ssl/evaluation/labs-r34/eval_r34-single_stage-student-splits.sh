@@ -3,7 +3,10 @@
 # Default values
 epoch=${1:-19}
 dir=${2:-"training/ssl/ori/lr_baseline"}
-agent=${3:-"hydra_img_vit_ssl"}
+split=$3
+agent="hydra_img_r34_ssl"
+
+inference_model="student"
 
 # Format epoch with leading zero
 padded_epoch=$(printf "%02d" $epoch)
@@ -14,7 +17,11 @@ step=$((($epoch + 1) * 1330))
 metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
 
 # Set experiment name based on inference model
-experiment_name="${dir}/test-${padded_epoch}ep-student-one_stage"
+if [ "$inference_model" = "teacher" ]; then
+    experiment_name="${dir}/test-${padded_epoch}ep-one_stage"
+else
+    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-one_stage-$split"
+fi
 
 command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
 python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
@@ -26,13 +33,12 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
     agent.config.training=false \
     agent.config.only_ori_input=true \
-    agent.config.inference.model=student \
-    agent.config.vadv2_head_nlayers=6 \
+    agent.config.inference.model=${inference_model} \
     agent.config.refinement.use_multi_stage=false \
     experiment_name=${experiment_name} \
     +cache_path=null \
     metric_cache_path=${metric_cache_path} \
-    train_test_split=navtest \
+    train_test_split=$split \
 "
 
 echo "--- COMMAND ---"
@@ -44,6 +50,7 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/evaluation/lab/eval_vit-single_stage-6_layer.sh \
-    8 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/hydra_mdp_pp/hydra_img_r34_ssl-6_layer hydra_img_r34_ssl
+bash scripts/ssl/evaluation/labs-r34/eval_r34-single_stage-student-splits.sh \
+    10 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/hydra_mdp_pp/hydra_img_r34_ssl \
+    navtest_angle_split_0
 '
