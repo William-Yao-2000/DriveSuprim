@@ -1,10 +1,42 @@
 from typing import Dict, Optional, List
 import os
+from functools import partial
 
 import torch
 import torch.nn.functional as F
 
 from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
+
+
+def bce_loss_with_temperature(
+        predictions: torch.Tensor, targets: torch.Tensor, temperature: float = 1.0
+) -> torch.Tensor:
+    """
+    Binary Cross Entropy loss with temperature scaling.
+    :param predictions: model predictions (logits)
+    :param targets: ground truth labels
+    :param temperature: temperature scaling factor
+    :return: computed loss value
+    """
+    if temperature != 1.0:
+        predictions = predictions / temperature
+    return F.binary_cross_entropy_with_logits(predictions, targets)
+
+
+def bce_loss_with_label_smoothing(
+        predictions: torch.Tensor, targets: torch.Tensor, label_smoothing_value: float = 0.1,
+) -> torch.Tensor:
+    """
+    Binary Cross Entropy loss with label smoothing.
+    :param predictions: model predictions (logits)
+    :param targets: ground truth labels
+    :param label_smoothing_value: value for label smoothing
+    :return: computed loss value
+    """
+    smooth_targets = targets * (1 - label_smoothing_value) + 0.5 * label_smoothing_value
+    smooth_targets = smooth_targets.clamp(min=1e-7, max=1 - 1e-7)
+    return F.binary_cross_entropy_with_logits(predictions, smooth_targets, reduction='mean')
+
 
 
 def hydra_kd_imi_agent_loss_robust(
@@ -18,8 +50,16 @@ def hydra_kd_imi_agent_loss_robust(
     :param config: global Transfuser config
     :return: combined loss value
     """
-    # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-    #     import pdb; pdb.set_trace()
+    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        import pdb; pdb.set_trace()
+    
+    if config.lab.use_temperature_bce:
+        bce_loss_fn = partial(bce_loss_with_temperature, temperature=config.lab.bce_temperature)
+    else:
+        bce_loss_fn = F.binary_cross_entropy_with_logits
+    
+    if config.lab.use_label_smoothing:
+        bce_loss_fn = partial(bce_loss_with_label_smoothing, label_smoothing_value=config.lab.label_smoothing_value)
 
     no_at_fault_collisions, drivable_area_compliance, time_to_collision_within_bound, ego_progress = (
         predictions['no_at_fault_collisions'],
@@ -39,22 +79,16 @@ def hydra_kd_imi_agent_loss_robust(
     _dtype = imi.dtype
 
     # 2 cls
-    da_loss = F.binary_cross_entropy_with_logits(drivable_area_compliance,
-                                                 vocab_pdm_score['drivable_area_compliance'].to(_dtype))
-    ttc_loss = F.binary_cross_entropy_with_logits(time_to_collision_within_bound,
-                                                  vocab_pdm_score['time_to_collision_within_bound'].to(_dtype))
-    noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, three_to_two_classes(
-                                                  vocab_pdm_score['no_at_fault_collisions'].to(_dtype)))
-    progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(_dtype))
+    da_loss = bce_loss_fn(drivable_area_compliance, vocab_pdm_score['drivable_area_compliance'].to(_dtype))
+    ttc_loss = bce_loss_fn(time_to_collision_within_bound, vocab_pdm_score['time_to_collision_within_bound'].to(_dtype))
+    noc_loss = bce_loss_fn(no_at_fault_collisions, three_to_two_classes(vocab_pdm_score['no_at_fault_collisions'].to(_dtype)))
+    progress_loss = bce_loss_fn(ego_progress, vocab_pdm_score['ego_progress'].to(_dtype))
     # expansion
-    ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, three_to_two_classes(
-                                                  vocab_pdm_score['driving_direction_compliance'].to(_dtype)))
-    lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(_dtype))
-    tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance,
-                                                 vocab_pdm_score['traffic_light_compliance'].to(_dtype))
+    ddc_loss = bce_loss_fn(driving_direction_compliance, three_to_two_classes(vocab_pdm_score['driving_direction_compliance'].to(_dtype)))
+    lk_loss = bce_loss_fn(lane_keeping, vocab_pdm_score['lane_keeping'].to(_dtype))
+    tl_loss = bce_loss_fn(traffic_light_compliance,vocab_pdm_score['traffic_light_compliance'].to(_dtype))
     
-    comfort_loss = F.binary_cross_entropy_with_logits(history_comfort,
-                                                      vocab_pdm_score['history_comfort'].to(_dtype))
+    comfort_loss = bce_loss_fn(history_comfort,vocab_pdm_score['history_comfort'].to(_dtype))
     vocab = predictions["trajectory_vocab"]
     # B, 8 (4 secs, 0.5Hz), 3
     target_traj = targets["trajectory"]
@@ -121,8 +155,16 @@ def hydra_kd_imi_agent_loss_single_stage(
     :return: combined loss value
     """
 
-    # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-    #     import pdb; pdb.set_trace()
+    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        import pdb; pdb.set_trace()
+
+    if config.lab.use_temperature_bce:
+        bce_loss_fn = partial(bce_loss_with_temperature, temperature=config.lab.bce_temperature)
+    else:
+        bce_loss_fn = F.binary_cross_entropy_with_logits
+
+    if config.lab.use_label_smoothing:
+        bce_loss_fn = partial(bce_loss_with_label_smoothing, label_smoothing_value=config.lab.label_smoothing_value)
     
     layer_results = predictions['layer_results']
     losses = {}
@@ -148,22 +190,16 @@ def hydra_kd_imi_agent_loss_single_stage(
         
             _dtype = drivable_area_compliance.dtype
 
-            da_loss = F.binary_cross_entropy_with_logits(drivable_area_compliance,
-                                                        vocab_pdm_score['drivable_area_compliance'].to(_dtype))
-            ttc_loss = F.binary_cross_entropy_with_logits(time_to_collision_within_bound,
-                                                        vocab_pdm_score['time_to_collision_within_bound'].to(_dtype))
-            noc_loss = F.binary_cross_entropy_with_logits(no_at_fault_collisions, three_to_two_classes(
-                                                        vocab_pdm_score['no_at_fault_collisions'].to(_dtype)))
-            progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(_dtype))
+            da_loss = bce_loss_fn(drivable_area_compliance, vocab_pdm_score['drivable_area_compliance'].to(_dtype))
+            ttc_loss = bce_loss_fn(time_to_collision_within_bound, vocab_pdm_score['time_to_collision_within_bound'].to(_dtype))
+            noc_loss = bce_loss_fn(no_at_fault_collisions, three_to_two_classes(vocab_pdm_score['no_at_fault_collisions'].to(_dtype)))
+            progress_loss = bce_loss_fn(ego_progress, vocab_pdm_score['ego_progress'].to(_dtype))
             # expansion
-            ddc_loss = F.binary_cross_entropy_with_logits(driving_direction_compliance, three_to_two_classes(
-                                                        vocab_pdm_score['driving_direction_compliance'].to(_dtype)))
-            lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(_dtype))
-            tl_loss = F.binary_cross_entropy_with_logits(traffic_light_compliance,
-                                                        vocab_pdm_score['traffic_light_compliance'].to(_dtype))
+            ddc_loss = bce_loss_fn(driving_direction_compliance, three_to_two_classes(vocab_pdm_score['driving_direction_compliance'].to(_dtype)))
+            lk_loss = bce_loss_fn(lane_keeping, vocab_pdm_score['lane_keeping'].to(_dtype))
+            tl_loss = bce_loss_fn(traffic_light_compliance, vocab_pdm_score['traffic_light_compliance'].to(_dtype))
             
-            comfort_loss = F.binary_cross_entropy_with_logits(history_comfort,
-                                                            vocab_pdm_score['history_comfort'].to(_dtype))
+            comfort_loss = bce_loss_fn(history_comfort, vocab_pdm_score['history_comfort'].to(_dtype))
 
             noc_loss_final = config.trajectory_pdm_weight['no_at_fault_collisions'] * noc_loss
             da_loss_final = config.trajectory_pdm_weight['drivable_area_compliance'] * da_loss
@@ -194,11 +230,10 @@ def hydra_kd_imi_agent_loss_single_stage(
 
             _dtype = drivable_area_compliance.dtype
 
-            da_loss = F.binary_cross_entropy_with_logits(drivable_area_compliance,
-                                                        vocab_pdm_score['drivable_area_compliance'].to(_dtype))
-            progress_loss = F.binary_cross_entropy_with_logits(ego_progress, vocab_pdm_score['ego_progress'].to(_dtype))
+            da_loss = bce_loss_fn(drivable_area_compliance, vocab_pdm_score['drivable_area_compliance'].to(_dtype))
+            progress_loss = bce_loss_fn(ego_progress, vocab_pdm_score['ego_progress'].to(_dtype))
             # expansion
-            lk_loss = F.binary_cross_entropy_with_logits(lane_keeping, vocab_pdm_score['lane_keeping'].to(_dtype))
+            lk_loss = bce_loss_fn(lane_keeping, vocab_pdm_score['lane_keeping'].to(_dtype))
 
             da_loss_final = config.trajectory_pdm_weight['drivable_area_compliance'] * da_loss
             progress_loss_final = config.trajectory_pdm_weight['ego_progress'] * progress_loss
@@ -212,8 +247,7 @@ def hydra_kd_imi_agent_loss_single_stage(
 
             if refinement_metrics == 'dac_ep_lk_pdms':
                 pdm = layer_result['pdm_score']
-                pdm_loss = F.binary_cross_entropy_with_logits(pdm,
-                                                             vocab_pdm_score['pdm_score'].to(_dtype))
+                pdm_loss = bce_loss_fn(pdm, vocab_pdm_score['pdm_score'].to(_dtype))
                 pdm_loss_final = 2.0 * pdm_loss
                 loss += pdm_loss_final
 

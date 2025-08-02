@@ -147,6 +147,10 @@ config:
     optimize_prev_frame_traj_for_ec: false
     refinement_metrics: 'all'
     use_higher_res_feat_in_refinement: false
+    use_temperature_bce: false
+    bce_temperature: 2.0
+    use_label_smoothing: false
+    label_smoothing_value: 0.1
     use_cosine_ema_scheduler: false
     ema_momentum_start: 0.99
     save_pickle: false

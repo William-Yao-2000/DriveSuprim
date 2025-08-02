@@ -120,6 +120,11 @@ class LabConfig:
     refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
     use_higher_res_feat_in_refinement: bool = False
 
+    use_temperature_bce: bool = False
+    bce_temperature: float = 3.0
+    use_label_smoothing: bool = False
+    label_smoothing_value: float = 0.1
+
     use_cosine_ema_scheduler: bool = False
     ema_momentum_start: float = 0.99
     update_buffer_in_ema: bool = False
