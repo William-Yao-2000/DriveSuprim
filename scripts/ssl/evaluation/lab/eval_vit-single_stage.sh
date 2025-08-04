@@ -27,7 +27,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     +debug=false \
     +use_pdm_closed=false \
     agent=$agent \
-    dataloader.params.batch_size=8 \
+    dataloader.params.batch_size=1 \
     worker.threads_per_node=128 \
     agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
     agent.config.training=false \
@@ -49,6 +49,8 @@ eval $command_string
 
 : '
 usage:
+CUDA_VISIBLE_DEVICES=0 \
 bash scripts/ssl/evaluation/lab/eval_vit-single_stage.sh \
-    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/single_stage
+    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/hydra_mdp_pp/hydra_img_vit_ssl \
+    hydra_img_vit_ssl teacher
 '
