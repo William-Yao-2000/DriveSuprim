@@ -17,6 +17,8 @@ from navsim.agents.transfuser.transfuser_model import TransfuserModel
 from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
 
+import time
+inference_time, cnt = 0.0, 0
 
 class TransfuserAgent(AbstractAgent):
     """Agent interface for TransFuser baseline."""
@@ -83,7 +85,17 @@ class TransfuserAgent(AbstractAgent):
 
     def forward(self, features: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Inherited, see superclass."""
-        return self._transfuser_model(features)
+        global inference_time, cnt
+        start_time = time.time()
+        result = self._transfuser_model(features)
+        end_time = time.time()
+        cnt += 1
+        if cnt > 16:
+            inference_time += (end_time - start_time)
+            print(f'Inference time: {end_time - start_time:.4f}s, Average inference time: {inference_time / (cnt - 16):.4f}s')
+            print(f'Average FPS: {1.0 / (inference_time / (cnt - 16)):.4f}')
+        
+        return result
 
     def compute_loss(
         self,
