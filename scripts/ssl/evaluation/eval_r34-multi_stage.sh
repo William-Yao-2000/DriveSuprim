@@ -35,7 +35,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     +debug=false \
     +use_pdm_closed=false \
     agent=$agent \
-    dataloader.params.batch_size=8 \
+    dataloader.params.batch_size=1 \
     worker.threads_per_node=128 \
     agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
     agent.config.training=false \
@@ -63,6 +63,6 @@ eval $command_string
 : '
 usage:
 bash scripts/ssl/evaluation/eval_r34-multi_stage.sh \
-    9 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/stage_layers_3-topks_8192-only_ori_input-ban_soft_label_loss \
-    1 3 8192 hydra_img_r34_ssl student
+    8 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256-hydra_img_r34_ssl \
+    1 3 256 hydra_img_r34_ssl teacher
 '

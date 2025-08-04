@@ -15,6 +15,10 @@ from navsim.agents.utils.attn import MemoryEffTransformer
 from navsim.agents.utils.nerf import nerf_positional_encoding
 
 
+inference_time = 0.0
+cnt = 0
+import time
+
 class HydraModel(nn.Module):
     def __init__(self, config: HydraConfigSSL):
         super().__init__()
@@ -107,6 +111,8 @@ class HydraModel(nn.Module):
         
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
+        global inference_time, cnt
+        start_time = time.time()
         
         output: Dict[str, torch.Tensor] = {}
 
@@ -151,8 +157,9 @@ class HydraModel(nn.Module):
                 bev_feat_fg = img_feat_dict['higher_res_feat']
             else:
                 bev_feat_fg = img_feat_dict['patch_token']  # [bs, c_vit, w, h]
-            final_traj = self._trajectory_offset_head(bev_feat_fg, trajectory['refinement'])
+            final_traj, filtered_scores = self._trajectory_offset_head(bev_feat_fg, trajectory['refinement'])
             trajectory['final_traj'] = final_traj
+            trajectory['filtered_final_scores'] = filtered_scores
             
 
         if self._config.lab.check_top_k_traj:
@@ -168,6 +175,11 @@ class HydraModel(nn.Module):
         output.update(trajectory)
         # agents = self._agent_head(agents_query)
         # output.update(agents)
+        end_time = time.time()
+        inference_time += (end_time - start_time)
+        cnt += 1
+        print(f'Inference time: {end_time - start_time:.4f}s, Total inference time: {inference_time:.4f}s, Average inference time: {inference_time / cnt:.4f}s')
+        print(f'Average FPS: {1.0 / (inference_time / cnt):.4f}')
 
         return output
 
@@ -685,8 +697,9 @@ class TrajOffsetHead(nn.Module):
                 select_indices = scores.argmax(1)
                 batch_indices = torch.arange(B, device=select_indices.device)
                 final_traj = refinement_dict[-1]['trajs'][batch_indices, select_indices]
+                filtered_scores = scores
         
-        return final_traj
+        return final_traj, filtered_scores
     
 
 class TransformerDecoder_v2(nn.TransformerDecoder):
