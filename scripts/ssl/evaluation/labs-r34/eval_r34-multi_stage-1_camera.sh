@@ -35,7 +35,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     +debug=false \
     +use_pdm_closed=false \
     agent=hydra_img_r34_ssl \
-    dataloader.params.batch_size=8 \
+    dataloader.params.batch_size=1 \
     worker.threads_per_node=128 \
     agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
     agent.config.training=false \
@@ -65,6 +65,7 @@ eval $command_string
 
 : '
 usage:
-bash scripts/ssl/evaluation/lab/eval_r34-multi_stage-1_camera.sh \
+CUDA_VISIBLE_DEVICES=0 \
+bash scripts/ssl/evaluation/labs-r34/eval_r34-multi_stage-1_camera.sh \
   9 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/stage_layers_3-topks_256-1_camera
 '
