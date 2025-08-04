@@ -176,10 +176,11 @@ class HydraModel(nn.Module):
         # agents = self._agent_head(agents_query)
         # output.update(agents)
         end_time = time.time()
-        inference_time += (end_time - start_time)
         cnt += 1
-        print(f'Inference time: {end_time - start_time:.4f}s, Total inference time: {inference_time:.4f}s, Average inference time: {inference_time / cnt:.4f}s')
-        print(f'Average FPS: {1.0 / (inference_time / cnt):.4f}')
+        if cnt > 16:
+            inference_time += (end_time - start_time)
+            print(f'Inference time: {end_time - start_time:.4f}s, Average inference time: {inference_time / (cnt - 16):.4f}s')
+            print(f'Average FPS: {1.0 / (inference_time / (cnt - 16)):.4f}')
 
         return output
 
