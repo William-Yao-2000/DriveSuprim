@@ -7,19 +7,21 @@ partition=$5
 
 dir_name=$(echo $bash_file-$stage_layers-$topks | tr '/' '-' | tr '.' 'dot')
 
+PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
+
 submit_job \
     --gpu 8 \
     --tasks_per_node 8 \
     --nodes 1 \
     -n "$dir_name" \
-    --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
-    --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
+    --image $PREFIX_PATH/container_images/ywh-navsim.sqsh \
+    --logroot $PREFIX_PATH/slurm_logs/navsim_v2/training \
     --email_mode never \
     --duration 4 \
     --dependent_clones 0 \
     --partition $partition \
     --account av_research \
-    -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash $bash_file $num_refinement_stage $stage_layers $topks"
+    -c ". $PREFIX_PATH/pre-navsim_v2.sh; bash $bash_file $num_refinement_stage $stage_layers $topks"
 
 
 : '
