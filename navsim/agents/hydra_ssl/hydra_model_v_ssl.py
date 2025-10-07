@@ -111,8 +111,8 @@ class HydraModel(nn.Module):
         
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
-        global inference_time, cnt
-        start_time = time.time()
+        # global inference_time, cnt
+        # start_time = time.time()
         
         output: Dict[str, torch.Tensor] = {}
 
@@ -175,12 +175,12 @@ class HydraModel(nn.Module):
         output.update(trajectory)
         # agents = self._agent_head(agents_query)
         # output.update(agents)
-        end_time = time.time()
-        cnt += 1
-        if cnt > 16:
-            inference_time += (end_time - start_time)
-            print(f'Inference time: {end_time - start_time:.4f}s, Average inference time: {inference_time / (cnt - 16):.4f}s')
-            print(f'Average FPS: {1.0 / (inference_time / (cnt - 16)):.4f}')
+        # end_time = time.time()
+        # cnt += 1
+        # if cnt > 16:
+        #     inference_time += (end_time - start_time)
+        #     print(f'Inference time: {end_time - start_time:.4f}s, Average inference time: {inference_time / (cnt - 16):.4f}s')
+        #     print(f'Average FPS: {1.0 / (inference_time / (cnt - 16)):.4f}')
 
         return output
 
