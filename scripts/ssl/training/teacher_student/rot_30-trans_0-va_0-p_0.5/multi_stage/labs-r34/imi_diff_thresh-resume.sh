@@ -23,7 +23,7 @@ padded_ckpt_epoch=$(printf "%02d" $ckpt_epoch)
 # Calculate step from epoch (1330 steps per epoch)
 step=$((($ckpt_epoch + 1) * 1330))
 
-resume="epoch\=${padded_ckpt_epoch}-step\=${step}.ckpt"
+resume="epoch=${padded_ckpt_epoch}-step=${step}.ckpt"
 
 if [ -z "$resume" ]; then
     echo -e "Wrong! You need to provide the resume model name!"
