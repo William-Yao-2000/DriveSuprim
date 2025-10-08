@@ -17,7 +17,7 @@ soft_label_imi_diff_thresh=$1
 dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs-r34/stage_layers_$stage_layers-topks_$topks-imi_thresh_$soft_label_imi_diff_thresh
 
 
-command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
+command_string="$NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=false \
     agent=$agent \
     experiment_name=$dir \
