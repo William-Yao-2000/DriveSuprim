@@ -9,7 +9,7 @@ PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
 submit_job \
     --gpu 8 \
-    --tasks_per_node 8 \
+    --tasks_per_node 1 \
     --nodes 1 \
     -n "$dir_name" \
     --image $PREFIX_PATH/container_images/ywh-navsim.sqsh \
@@ -26,5 +26,5 @@ submit_job \
 usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/labs-r34/imi_diff_thresh.sh \
     scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/imi_diff_thresh.sh \
-    interactive 0.0
+    interactive 0.5
 '
