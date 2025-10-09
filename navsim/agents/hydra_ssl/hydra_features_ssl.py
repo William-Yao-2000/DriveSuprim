@@ -160,8 +160,8 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         cameras = agent_input.cameras[-seq_len:]  # List[Cameras]
         assert(len(cameras) == seq_len)
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         res['ori_teacher'] = []
         res['ori'] = []
@@ -172,10 +172,10 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
                 n_camera = self._config.n_camera
 
                 # Crop to ensure 4:1 aspect ratio
+                l1 = camera.cam_l1.image[28:-28]
                 l0 = camera.cam_l0.image[28:-28, 416:-416]
                 f0 = camera.cam_f0.image[28:-28]
                 r0 = camera.cam_r0.image[28:-28, 416:-416]
-                l1 = camera.cam_l1.image[28:-28]
                 r1 = camera.cam_r1.image[28:-28]
                 if n_camera >= 5:
                     l2 = camera.cam_l2.image[28:-28, :-1100]
@@ -185,6 +185,11 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
 
                 if n_camera == 1:
                     ori_image = f0
+                    if self._config.lab.limited_1_camera:
+                        l0 = np.zeros_like(f0)
+                        r0 = np.zeros_like(f0)
+                        l1 = np.zeros_like(f0)
+                        r1 = np.zeros_like(f0)
                 elif n_camera == 3:
                     ori_image = np.concatenate([l0, f0, r0], axis=1)
                 elif n_camera == 5:

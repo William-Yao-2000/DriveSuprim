@@ -119,6 +119,7 @@ class LabConfig:
     optimize_prev_frame_traj_for_ec: bool = False
     refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
     use_higher_res_feat_in_refinement: bool = False
+    limited_1_camera: bool = False
 
     use_temperature_bce: bool = False
     bce_temperature: float = 3.0

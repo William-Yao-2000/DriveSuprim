@@ -147,6 +147,7 @@ config:
     optimize_prev_frame_traj_for_ec: false
     refinement_metrics: 'all'
     use_higher_res_feat_in_refinement: false
+    limited_1_camera: false
     use_temperature_bce: false
     bce_temperature: 2.0
     use_label_smoothing: false
