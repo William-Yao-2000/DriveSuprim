@@ -5,6 +5,7 @@ import pickle
 import uuid
 from pathlib import Path
 import json, copy
+from scipy.interpolate import interp1d
 
 import hydra
 import matplotlib.pyplot as plt
@@ -30,8 +31,8 @@ python navtest.py scene_filter=navtest experiment_name=debug split=test worker=r
 
 # your path to these files
 vocab = np.load(f'{os.getenv("NAVSIM_DEVKIT_ROOT")}/traj_final/test_8192_kmeans.npy')
-subscores = pickle.load(open(f'{os.getenv("NAVSIM_EXP_ROOT")}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256/epoch=05-step=7980.pkl', 'rb'))
-output_dir = f'{os.getenv("NAVSIM_EXP_ROOT")}/vis/ego_perturbation/rot_30-trans_0-va_0.3-p_0.5/baseline'
+subscores = pickle.load(open(f'{os.getenv("NAVSIM_EXP_ROOT")}/training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/stage_layers_3-topks_256/epoch=05-step=7980-navtest_vis_1.pkl', 'rb'))
+output_dir = f'{os.getenv("NAVSIM_EXP_ROOT")}/vis/multi-stage/final-navtest_vis_1'
 os.makedirs(output_dir, exist_ok=True)
 
 logger = logging.getLogger(__name__)
@@ -185,7 +186,7 @@ def worker_task(args):
 
         subscore = subscores[token]
         for k, v in subscore.items():
-            if k != 'trajectory' and k != 'trajectory_pre' and k != 'comfort' and k not in ('lk', 'tl', 'dr') and k != 'filtered_traj':
+            if k != 'trajectory' and k != 'trajectory_pre' and k != 'comfort' and k not in ('lk', 'tl', 'dr') and k != 'filtered_traj' and k != 'final_traj':
                 subscore[k] = torch.from_numpy(v)
 
         # inference
@@ -202,8 +203,44 @@ def worker_task(args):
         #     import pdb; pdb.set_trace()
         model_traj[:, :2] = np.dot(model_traj[:, :2], rot_matrix.T)
 
-        filtered_trajs = subscore['filtered_traj']
 
+        model_traj_np = model_traj  # 如果是 PyTorch tensor，先转为 numpy
+
+        # 原始时间轴（点的索引）
+        t_original = np.linspace(0, 1, 40)
+        # 新的时间轴（要插值到的 200 个点）
+        t_new = np.linspace(0, 1, 1000)
+
+        # 分别对 x, y, angle 进行插值
+        interp_func = interp1d(t_original, model_traj_np, axis=0, kind='linear')
+        model_traj_interp = interp_func(t_new)  # shape: (200, 3)
+
+        model_traj = model_traj_interp
+
+        # filtered_trajs = vocab[47:48]
+        # filtered_trajs = subscore['filtered_traj']
+
+        # if isinstance(filtered_trajs, torch.Tensor):
+        #     filtered_trajs_np = filtered_trajs.cpu().numpy()
+        # else:
+        #     filtered_trajs_np = filtered_trajs
+
+        # # 时间轴
+        # t_original = np.linspace(0, 1, 40)
+        # t_new = np.linspace(0, 1, 1000)
+
+        # # 存放插值后的轨迹
+        # interpolated_trajs = []
+
+        # for traj in filtered_trajs_np:  # traj: shape (40, 3)
+        #     interp_func = interp1d(t_original, traj, axis=0, kind='linear')
+        #     traj_interp = interp_func(t_new)  # shape: (1000, 3)
+        #     interpolated_trajs.append(traj_interp)
+
+        # # 拼接成 (16, 1000, 3)
+        # interpolated_trajs = np.stack(interpolated_trajs, axis=0)
+
+        # filtered_trajs = interpolated_trajs
 
 
         # Debug visualization of predicted and GT trajectories
@@ -222,6 +259,17 @@ def worker_task(args):
             plt.close()
 
         gt_traj = gt_traj.poses
+        # 原始时间轴（点的索引）
+        t_original = np.linspace(0, 1, 8)
+        # 新的时间轴（要插值到的 200 个点）
+        t_new = np.linspace(0, 1, 1000)
+
+        # 分别对 x, y, angle 进行插值
+        interp_func = interp1d(t_original, gt_traj, axis=0, kind='linear')
+        gt_traj = interp_func(t_new)  # shape: (200, 3)
+
+
+
         file_name = f'{token}'
         save_path = f'{output_dir}/{file_name}.png'
         # if os.path.exists(save_path):
@@ -272,15 +320,17 @@ def worker_task(args):
 
         img = Image.fromarray(img.astype('uint8'), 'RGB').convert('RGBA')
 
+        img = Image.alpha_composite(img, get_overlay(gt_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
+                                                     color=(0, 255, 0, 255)))
+        
+
         img = Image.alpha_composite(img, get_overlay(model_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
-                                                     color=(0, 0, 255, 255)))
+                                                     color=(15,175,253, 255)))
         
         # for i, traj in enumerate(filtered_trajs):
         #     img = Image.alpha_composite(img, get_overlay(traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
-        #                                              color=(0, 0, 244-i*9, 196-i*6)))
+        #                                              color=(251,10,20, 240)))
 
-        img = Image.alpha_composite(img, get_overlay(gt_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
-                                                     color=(0, 255, 0, 255)))
         img = img.convert('RGB')
 
         # # distributions of vocab

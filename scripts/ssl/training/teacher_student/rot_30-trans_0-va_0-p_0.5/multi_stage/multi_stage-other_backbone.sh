@@ -51,5 +51,5 @@ eval $command_string
 : '
 usage:
 bash scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-other_backbone.sh \
-  hydra_img_r34_ssl 1 1 256
+  hydra_img_r34_ssl 1 3 256
 '

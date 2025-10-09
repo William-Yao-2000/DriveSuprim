@@ -51,6 +51,6 @@ eval $command_string
 usage:
 CUDA_VISIBLE_DEVICES=0 \
 bash scripts/ssl/evaluation/lab/eval_vit-single_stage.sh \
-    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/hydra_mdp_pp/hydra_img_vit_ssl \
-    hydra_img_vit_ssl teacher
+    5 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs/hydra_mdp_pp/hydra_img_vov_ssl \
+    hydra_img_vov_ssl teacher
 '

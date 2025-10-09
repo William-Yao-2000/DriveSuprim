@@ -5,6 +5,9 @@ import pickle
 import uuid
 from pathlib import Path
 import json, copy
+from scipy.interpolate import interp1d
+import torch
+
 
 import hydra
 import matplotlib.pyplot as plt
@@ -202,6 +205,19 @@ def worker_task(args):
         #     import pdb; pdb.set_trace()
         model_traj[:, :2] = np.dot(model_traj[:, :2], rot_matrix.T)
 
+        model_traj_np = model_traj  # 如果是 PyTorch tensor，先转为 numpy
+
+        # 原始时间轴（点的索引）
+        t_original = np.linspace(0, 1, 40)
+        # 新的时间轴（要插值到的 200 个点）
+        t_new = np.linspace(0, 1, 1000)
+
+        # 分别对 x, y, angle 进行插值
+        interp_func = interp1d(t_original, model_traj_np, axis=0, kind='linear')
+        model_traj_interp = interp_func(t_new)  # shape: (200, 3)
+
+        model_traj = model_traj_interp
+
 
         # Debug visualization of predicted and GT trajectories
         if arg['cfg'].debug:
@@ -219,6 +235,15 @@ def worker_task(args):
             plt.close()
 
         gt_traj = gt_traj.poses
+        # 原始时间轴（点的索引）
+        t_original = np.linspace(0, 1, 8)
+        # 新的时间轴（要插值到的 200 个点）
+        t_new = np.linspace(0, 1, 1000)
+
+        # 分别对 x, y, angle 进行插值
+        interp_func = interp1d(t_original, gt_traj, axis=0, kind='linear')
+        gt_traj = interp_func(t_new)  # shape: (200, 3)
+
         file_name = f'{token}'
         save_path = f'{output_dir}/{file_name}.png'
         # if os.path.exists(save_path):
@@ -269,11 +294,13 @@ def worker_task(args):
 
         img = Image.fromarray(img.astype('uint8'), 'RGB').convert('RGBA')
 
-        img = Image.alpha_composite(img, get_overlay(model_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
-                                                     color=(240, 0, 0, 255)))
-
         img = Image.alpha_composite(img, get_overlay(gt_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
                                                      color=(0, 255, 0, 255)))
+        # img = Image.alpha_composite(img, get_overlay(model_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
+        #                                              color=(178,50,243,240)))
+        img = Image.alpha_composite(img, get_overlay(model_traj, cam2lidar_rot, cam2lidar_tran, cam_intrin,
+                                                     color=(251,76,20,255)))
+
         img = img.convert('RGB')
 
         # # distributions of vocab

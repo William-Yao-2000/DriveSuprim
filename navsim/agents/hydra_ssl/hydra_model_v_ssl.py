@@ -15,9 +15,9 @@ from navsim.agents.utils.attn import MemoryEffTransformer
 from navsim.agents.utils.nerf import nerf_positional_encoding
 
 
-inference_time = 0.0
-cnt = 0
-import time
+# inference_time = 0.0
+# cnt = 0
+# import time
 
 class HydraModel(nn.Module):
     def __init__(self, config: HydraConfigSSL):

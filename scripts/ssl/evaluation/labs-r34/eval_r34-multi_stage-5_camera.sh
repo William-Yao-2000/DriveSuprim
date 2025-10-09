@@ -62,3 +62,11 @@ echo $command_string
 echo -e "\n\n"
 
 eval $command_string
+
+
+: '
+usage:
+CUDA_VISIBLE_DEVICES=0 \
+bash scripts/ssl/evaluation/labs-r34/eval_r34-multi_stage-5_camera.sh \
+  9 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/stage_layers_3-topks_256-5_camera
+'

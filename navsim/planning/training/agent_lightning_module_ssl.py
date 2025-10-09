@@ -316,7 +316,9 @@ class AgentLightningModuleSSL(pl.LightningModule):
         if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
             import pdb; pdb.set_trace()
 
-        # filtered_trajs_all = predictions['refinement'][0]['trajs']
+        # filtered_trajs = predictions['refinement'][0]['trajs']
+        # filtered_indices = predictions['refinement'][0]['indices_absolute']
+        # filtered_scores = predictions['filtered_final_scores']
 
         result = {}
         for (pose,
@@ -329,6 +331,8 @@ class AgentLightningModuleSSL(pl.LightningModule):
              lane_keeping,
              traffic_light_compliance,
             #  filtered_traj,
+            #  filtered_index,
+            #  filtered_score,
              token) in \
                 zip(poses,
                     imis,
@@ -339,7 +343,9 @@ class AgentLightningModuleSSL(pl.LightningModule):
                     driving_direction_compliance_all,
                     lane_keeping_all,
                     traffic_light_compliance_all,
-                    # filtered_trajs_all,
+                    # filtered_trajs,
+                    # filtered_indices,
+                    # filtered_scores,
                     tokens):
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
@@ -351,6 +357,8 @@ class AgentLightningModuleSSL(pl.LightningModule):
                 'driving_direction_compliance': driving_direction_compliance,
                 'lane_keeping': lane_keeping,
                 'traffic_light_compliance': traffic_light_compliance,
-                # 'filtered_traj': filtered_traj[:16],
+                # 'filtered_traj': filtered_traj,
+                # 'filtered_index': filtered_index,
+                # 'filtered_score': filtered_score,
             }
         return result
