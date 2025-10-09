@@ -35,7 +35,7 @@ python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_
     +debug=false \
     +use_pdm_closed=false \
     agent=$agent \
-    dataloader.params.batch_size=1 \
+    dataloader.params.batch_size=8 \
     worker.threads_per_node=128 \
     agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
     agent.config.training=false \
