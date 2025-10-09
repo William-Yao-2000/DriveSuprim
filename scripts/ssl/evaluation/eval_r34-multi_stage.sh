@@ -30,14 +30,13 @@ if [ "$use_first_stage_traj_in_infer" = "true" ]; then
     experiment_name="$experiment_name-use_first_stage_traj_in_infer"
 fi
 
-command_string="TORCH_NCCL_ENABLE_MONITORING=0 \
-python ${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
+command_string="${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
     +debug=false \
     +use_pdm_closed=false \
     agent=$agent \
     dataloader.params.batch_size=1 \
     worker.threads_per_node=128 \
-    agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch\=${padded_epoch}-step\=${step}.ckpt' \
+    agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch=${padded_epoch}-step=${step}.ckpt' \
     agent.config.training=false \
     agent.config.only_ori_input=true \
     agent.config.inference.model=${inference_model} \
@@ -57,7 +56,7 @@ echo "--- COMMAND ---"
 echo $command_string
 echo -e "\n\n"
 
-eval $command_string
+torchrun --nproc_per_node=8 --master_port=29500 $command_string
 
 
 : '

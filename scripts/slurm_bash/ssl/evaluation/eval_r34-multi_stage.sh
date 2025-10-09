@@ -28,7 +28,7 @@ dir_name=$(echo $dir | tr '/' '-' | tr '.' 'dot')
 
 submit_job \
     --gpu 8 \
-    --tasks_per_node 8 \
+    --tasks_per_node 1 \
     --nodes 1 \
     -n "eval-navsim_ssl-$dir_name-${epoch}epoch" \
     --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
