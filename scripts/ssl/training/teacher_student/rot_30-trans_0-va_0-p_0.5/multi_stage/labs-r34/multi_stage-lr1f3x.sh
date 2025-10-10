@@ -15,7 +15,7 @@ topks=256
 dir=training/ssl/teacher_student/rot_$rot-trans_$trans-va_$va-p_$probability/multi_stage/labs-r34/stage_layers_$stage_layers-topks_$topks-$agent-lr1f3x
 
 
-command_string="python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
+command_string="$NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=false \
     agent=$agent \
     experiment_name=$dir \
@@ -45,8 +45,7 @@ echo "--- COMMAND ---"
 echo $command_string
 echo "\n\n"
 
-eval $command_string
-
+torchrun --nproc_per_node=8 --master_port=29500 $command_string
 
 : '
 usage:

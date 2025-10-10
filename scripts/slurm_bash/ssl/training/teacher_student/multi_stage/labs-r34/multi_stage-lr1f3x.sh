@@ -8,7 +8,7 @@ PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
 submit_job \
     --gpu 8 \
-    --tasks_per_node 8 \
+    --tasks_per_node 1 \
     --nodes 1 \
     -n "$dir_name" \
     --image $PREFIX_PATH/container_images/ywh-navsim.sqsh \
