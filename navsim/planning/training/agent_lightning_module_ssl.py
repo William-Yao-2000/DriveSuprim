@@ -13,12 +13,8 @@ from torch import Tensor
 import torch.nn.functional as F
 
 from navsim.agents.abstract_agent import AbstractAgent
-from navsim.agents.dp.dp_agent import DPAgent
-from navsim.agents.hydra_plus.hydra_features import state2traj
-from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
-from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
-from navsim.agents.hydra_ssl.hydra_agent_ssl import HydraAgentSSL
-from navsim.agents.hydra_ssl.utils.util import CosineScheduler
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
+from navsim.agents.drivesuprim.drivesuprim_agent import DriveSuprimAgent
 from navsim.common.dataclasses import Trajectory
 from navsim.planning.simulation.planner.pdm_planner.simulation.pdm_simulator import PDMSimulator
 
@@ -27,7 +23,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
     """Pytorch lightning wrapper for learnable agent."""
 
     def __init__(self,
-                 cfg: HydraConfigSSL,
+                 cfg: DriveSuprimConfig,
                  agent: AbstractAgent):
         """
         Initialise the lightning module wrapper.
@@ -36,21 +32,14 @@ class AgentLightningModuleSSL(pl.LightningModule):
         super().__init__()
 
         self._cfg = cfg
-        self.agent: HydraAgentSSL = agent
+        self.agent: DriveSuprimAgent = agent
         self.simulator = PDMSimulator(
             TrajectorySampling(num_poses=40, interval_length=0.1)
         )
         self.v_params = get_pacifica_parameters()
-        # self.hydra_preds = pickle.load(open(f'{os.getenv("NAVSIM_EXP_ROOT")}/hydra_plus_v2ep/epoch19.pkl', 'rb'))
-        # self.vocab = torch.from_numpy(
-        #     np.load(f'{os.getenv("NAVSIM_DEVKIT_ROOT")}/traj_final/test_16384_rearaxle_kmeans.npy')
-        # )
 
         self.only_ori_input = cfg.only_ori_input
         self.n_rotation_crop = cfg.student_rotation_ensemble
-
-        if self._cfg.lab.use_cosine_ema_scheduler:
-            self.momentum_schedule = CosineScheduler(self._cfg.lab.ema_momentum_start, 0.999, 10)
 
 
     def _step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], logging_prefix: str) -> Tensor:
@@ -94,17 +83,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
             self.log(f"{logging_prefix}/loss-soft", loss_soft_teacher[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + loss_soft_teacher[0]
 
-        if self._cfg.use_rotation_loss:
-            loss_rotation = self.agent.compute_rotation_loss(teacher_pred, student_preds, tokens)
-            self.log(f"{logging_prefix}/loss-rotation", loss_rotation, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-            loss += loss_rotation
-        else:
-            loss += student_preds[0]['cls_token_after_head'].sum() * 0.0
-
-        if self._cfg.use_mask_loss:
-            loss_ibot = loss_dict['loss_ibot']
-            self.log(f"{logging_prefix}/loss-ibot", loss_ibot, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-            loss += loss_ibot
+        loss += student_preds[0]['cls_token_after_head'].sum() * 0.0  # TODO: fix
 
         if self._cfg.refinement.use_multi_stage:
             loss_refinement = self.agent.compute_loss_multi_stage(features, targets, student_preds, tokens)
@@ -121,19 +100,9 @@ class AgentLightningModuleSSL(pl.LightningModule):
                     self.log(f"{logging_prefix}/{k}-aug", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
                 self.log(f"{logging_prefix}/loss-refinement_aug", loss_refinement_aug[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
                 loss = loss + loss_refinement_aug[0]
-            
-        if self._cfg.lab.optimize_prev_frame_traj_for_ec:
-            teacher_pred_prev = teacher_pred_dict['prev']
-            loss_prev = self.agent.compute_loss_prev_traj(teacher_pred_prev, student_preds[0])
-            for k, v in loss_prev[1].items():
-                self.log(f"{logging_prefix}/{k}-prev", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log(f"{logging_prefix}/loss-prev", loss_prev[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-            loss = loss + loss_prev[0]
-
         
         self.log(f"{logging_prefix}/loss", loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
         
-
         return loss
 
     def training_step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], batch_idx: int) -> Tensor:
@@ -148,7 +117,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
     def on_train_start(self):
         self.agent.model.train()
 
-
     def optimizer_step(
         self,
         epoch: int,
@@ -157,8 +125,8 @@ class AgentLightningModuleSSL(pl.LightningModule):
         optimizer_closure = None,
     ) -> None:
         optimizer.step(closure=optimizer_closure)
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         # if self._cfg.lab.use_cosine_ema_scheduler:
         #     m = self.momentum_schedule[epoch]
 
@@ -196,92 +164,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
             batch_idx: int
     ):
         return self.predict_step_hydra(batch, batch_idx)
-
-    def predict_step_dp(
-            self,
-            batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
-            batch_idx: int
-    ):
-        features, targets, tokens = batch
-        self.agent.eval()
-        with torch.no_grad():
-            predictions = self.agent.forward(features)
-            # [B, PROPOSAL, HORIZON, 2]
-            controls = predictions["dp_pred"].cpu().numpy()
-
-        all_trajs = []
-        for batch_idx, command_states in enumerate(controls):
-            ego_state = EgoState.build_from_rear_axle(
-                StateSE2(*features['ego_pose'].cpu().numpy()[batch_idx]),
-                tire_steering_angle=0.0,
-                vehicle_parameters=self.v_params,
-                time_point=TimePoint(0),
-                rear_axle_velocity_2d=StateVector2D(
-                    *features['ego_velocity'].cpu().numpy()[batch_idx]
-                ),
-                rear_axle_acceleration_2d=StateVector2D(
-                    *features['ego_acceleration'].cpu().numpy()[batch_idx]
-                ),
-            )
-            traj_proposals = []
-            for command_state in command_states:
-                recovered_state = self.simulator.command_states2waypoints(
-                    command_state, ego_state
-                )
-                recovered_traj = state2traj(recovered_state.squeeze(0))
-                traj_proposals.append(recovered_traj)
-            all_trajs.append(np.array(traj_proposals))
-
-        # [B, PROPOSALS, HORIZON, 3]
-        all_trajs = np.array(all_trajs)
-
-        if all_trajs.shape[2] == 40:
-            interval_length = 0.1
-        else:
-            interval_length = 0.5
-
-        device = features['ego_pose'].device
-        result = {}
-        for (proposals, control, token) in zip(all_trajs, controls, tokens):
-            # todo use hydra to sample
-            # pose = proposals[0]
-            hydra_result = self.hydra_preds[token]
-
-            proposals_ = torch.from_numpy(proposals).to(device)
-            vocab_ = self.vocab.to(device)
-            dist = ((proposals_.unsqueeze(1) - vocab_.unsqueeze(0)) ** 2).sum((-1, -2))
-            dist_argmin = dist.argmin(1).cpu().numpy()
-
-            scores = (
-                    0.5 * hydra_result['no_at_fault_collisions'][dist_argmin] +
-                    0.5 * hydra_result['traffic_light_compliance'][dist_argmin] +
-                    0.5 * hydra_result['drivable_area_compliance'][dist_argmin] +
-                    0.5 * hydra_result['driving_direction_compliance'][dist_argmin] +
-                    8.0 * np.log(
-                5.0 * np.exp(hydra_result['time_to_collision_within_bound'][dist_argmin]) +
-                5.0 * np.exp(hydra_result['ego_progress'][dist_argmin]) +
-                2.0 * np.exp(hydra_result['lane_keeping'][dist_argmin])
-            )
-            )
-            # prevent from going backwards:
-            # 1. the overall trajectory goes backwards for 2m
-            # 2. the trajectory starts from x < -0.5m
-            backward_mask = (proposals_[..., 0] < -2.0).any(1).logical_and(proposals_[..., 0, 0] < -0.5)
-            scores[backward_mask.cpu().numpy()] -= 100.0
-
-            pose = proposals[scores.argmax(0)]
-            result[token] = {
-                'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
-                'proposals': proposals,
-                'controls': control
-            }
-
-        # debug
-        # min_dist = ((((targets['interpolated_traj'][:, None] - torch.from_numpy(all_trajs).to(targets['interpolated_traj'].device))[..., :2]) ** 2)
-        #  .sum((-1,-2))
-        #  .min(1))
-
-        return result
+    
 
     def predict_step_hydra(
             self,

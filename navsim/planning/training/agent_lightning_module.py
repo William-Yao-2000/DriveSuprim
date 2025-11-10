@@ -99,8 +99,6 @@ class AgentLightningModule(pl.LightningModule):
             return self.predict_step_transfuser(batch, batch_idx)
         elif isinstance(self.agent, HydraPlusAgent):
             return self.predict_step_hydra(batch, batch_idx)
-        elif isinstance(self.agent, DPAgent):
-            return self.predict_step_dp(batch, batch_idx)
         else:
             raise ValueError('unsupported agent')
 

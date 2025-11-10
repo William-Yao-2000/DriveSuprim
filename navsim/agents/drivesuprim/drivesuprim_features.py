@@ -1,17 +1,18 @@
-from enum import IntEnum
-from typing import Any, Dict, List, Tuple, Union
-import os
-import json, pickle
-import random
-
-from PIL import Image
-import imgaug.augmenters as iaa
 import cv2
+from enum import IntEnum
+import json, os
 import numpy as np
 import numpy.typing as npt
+from PIL import Image
+from shapely import affinity
+from shapely.geometry import Polygon, LineString
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from torchvision import transforms
 
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
+from navsim.agents.drivesuprim.data.transforms import GaussianBlur
 from nuplan.common.actor_state.ego_state import EgoState
 from nuplan.common.actor_state.oriented_box import OrientedBox
 from nuplan.common.actor_state.state_representation import StateSE2, TimePoint, StateVector2D
@@ -20,12 +21,7 @@ from nuplan.common.actor_state.vehicle_parameters import get_pacifica_parameters
 from nuplan.common.geometry.convert import absolute_to_relative_poses
 from nuplan.common.maps.abstract_map import AbstractMap, SemanticMapLayer, MapObject
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
-from shapely import affinity
-from shapely.geometry import Polygon, LineString
-from torchvision import transforms
 
-from navsim.agents.hydra_ssl_v1.hydra_config_ssl import HydraConfigSSL
-from navsim.agents.hydra_ssl_v1.data.transforms import GaussianBlur
 from navsim.common.dataclasses import AgentInput, Scene, Annotations
 from navsim.common.enums import BoundingBoxIndex, LidarIndex
 from navsim.evaluate.pdm_score import transform_trajectory, get_trajectory_as_array
@@ -38,8 +34,8 @@ from navsim.planning.training.abstract_feature_target_builder import (
 from navsim.planning.metric_caching.metric_cache_processor_aug_train import ego_state_augmentation
 
 
-class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
-    def __init__(self, config: HydraConfigSSL):
+class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
+    def __init__(self, config: DriveSuprimConfig):
         self._config = config
         self.training = config.training
 
@@ -106,7 +102,7 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
 
     def get_unique_name(self) -> str:
         """Inherited, see superclass."""
-        return "hydra_feature_ssl"
+        return "drivesuprim_feature"
 
     def compute_features(self, agent_input: AgentInput, scene: Scene) -> Dict[str, torch.Tensor]:
         """Inherited, see superclass."""
@@ -124,11 +120,6 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         features.update(self._get_camera_feature(agent_input, initial_token, rotation_num=n_rotated))  # List[torch.Tensor], tensor.shape == [c, h, w]
         if self._config.use_back_view:
             features["camera_feature_back"] = self._get_camera_feature_back(agent_input)
-
-        # if self._config.use_transfuser:
-        #     features.update(self._get_lidar_feature(agent_input, initial_token, rotation_num=n_rotated))
-        
-
 
         if self._config.use_pers_bev_embed:
             features["pers_bev"] = self._get_pers_bev(agent_input)
@@ -163,6 +154,9 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         seq_len = self._config.seq_len
         cameras = agent_input.cameras[-seq_len:]  # List[Cameras]
         assert(len(cameras) == seq_len)
+
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         res['ori_teacher'] = []
         res['ori'] = []
@@ -170,34 +164,65 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         for camera in cameras:
             image = camera.cam_l0.image
             if image is not None and image.size > 0 and np.any(image):
+                n_camera = self._config.n_camera
+
                 # Crop to ensure 4:1 aspect ratio
+                l1 = camera.cam_l1.image[28:-28]
                 l0 = camera.cam_l0.image[28:-28, 416:-416]
                 f0 = camera.cam_f0.image[28:-28]
                 r0 = camera.cam_r0.image[28:-28, 416:-416]
-                l1 = camera.cam_l1.image[28:-28]
                 r1 = camera.cam_r1.image[28:-28]
+                if n_camera >= 5:
+                    l2 = camera.cam_l2.image[28:-28, :-1100]
+                    r2 = camera.cam_r2.image[28:-28, 1100:]
+                    b0_left = camera.cam_b0.image[28:-28, :1080]
+                    b0_right = camera.cam_b0.image[28:-28, -1080:]
 
-                ori_image = np.concatenate([l0, f0, r0], axis=1)
+                if n_camera == 1:
+                    ori_image = f0
+                    if self._config.lab.limited_1_camera:
+                        l0 = np.zeros_like(f0)
+                        r0 = np.zeros_like(f0)
+                        l1 = np.zeros_like(f0)
+                        r1 = np.zeros_like(f0)
+                elif n_camera == 3:
+                    ori_image = np.concatenate([l0, f0, r0], axis=1)
+                elif n_camera == 5:
+                    ori_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
+                else:
+                    raise NotImplementedError
+
                 _ori_image = cv2.resize(ori_image, (self._config.camera_width, self._config.camera_height))
                 res['ori_teacher'].append(self.teacher_ori_augmentation(_ori_image))
                 student_ori_img = self.student_ori_augmentation(_ori_image)
-
                 res['ori'].append(student_ori_img)
 
                 # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
                 #     import pdb; pdb.set_trace()
-                stitched_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
+                if n_camera < 5:
+                    stitched_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
+                else:
+                    stitched_image = np.concatenate([b0_left, l2, l1, l0, f0, r0, r1, r2, b0_right], axis=1)
                 
-                img_w = l0.shape[1] + f0.shape[1] + r0.shape[1]
+                img_3cam_w = l0.shape[1] + f0.shape[1] + r0.shape[1]
                 l1_w = l1.shape[1]
                 r1_w = r1.shape[1]
                 whole_w = stitched_image.shape[1]
-                half_view_w = img_w + l1_w // 2 + r1_w // 2
+                half_view_w = img_3cam_w + l1_w // 2 + r1_w // 2
                 if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
                     debug_dir = 'debug_viz'
                     os.makedirs(debug_dir, exist_ok=True)
-                    _s_img = Image.fromarray(stitched_image[:, int(whole_w/2-half_view_w/2):int(whole_w/2+half_view_w/2)])
-                    _s_img.save(f'stitched_image.jpg')
+                    _s_img = Image.fromarray(stitched_image)
+                    _s_img.save(f'{debug_dir}/stitched_image.jpg')
+
+                if n_camera == 1:
+                    img_w = f0.shape[1]
+                elif n_camera == 3:
+                    img_w = img_3cam_w
+                elif n_camera == 5:
+                    img_w = img_3cam_w + l1_w + r1_w
+                else:
+                    raise NotImplementedError
 
                 for i in range(rotation_num):
                     _ego_rotation_angle_degree = self.aug_info[initial_token][i]['rot']
@@ -334,8 +359,8 @@ class HydraSSLFeatureBuilder(AbstractFeatureBuilder):
         return res_lidar
 
 
-class HydraSSLTargetBuilder(AbstractTargetBuilder):
-    def __init__(self, config: HydraConfigSSL):
+class DriveSuprimTargetBuilder(AbstractTargetBuilder):
+    def __init__(self, config: DriveSuprimConfig):
         self._config = config
         self.v_params = get_pacifica_parameters()
         self.training = config.training
@@ -358,8 +383,8 @@ class HydraSSLTargetBuilder(AbstractTargetBuilder):
     def compute_targets(self, scene: Scene) -> Dict[str, torch.Tensor]:
         """Inherited, see superclass."""
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         initial_token = scene.scene_metadata.initial_token
         future_traj = scene.get_future_trajectory(
             num_trajectory_frames=int(4 / 0.5)
@@ -434,8 +459,8 @@ class HydraSSLTargetBuilder(AbstractTargetBuilder):
                 rotated_poses = np.array(rotated_poses)
 
                 # Visualize both trajectories side by side
-                if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-                    _visualize_trajectories(future_traj.poses, rotated_poses, f'trajectory_comparison_{_reverse_rotation/np.pi*180:.2f}.png', '增强后的轨迹')
+                # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+                #     _visualize_trajectories(future_traj.poses, rotated_poses, f'trajectory_comparison_{_reverse_rotation/np.pi*180:.2f}.png', '增强后的轨迹')
 
                 rotated_trajectories.append(torch.tensor(rotated_poses))  # [num_poses, 3]
             else:
@@ -457,8 +482,8 @@ class HydraSSLTargetBuilder(AbstractTargetBuilder):
 
         max_agents = self._config.num_bounding_boxes
         agent_states_list: List[npt.NDArray[np.float32]] = []
-
-        def _xy_in_lidar(x: float, y: float, config: HydraConfigSSL) -> bool:
+        
+        def _xy_in_lidar(x: float, y: float, config: DriveSuprimConfig) -> bool:
             return (config.lidar_min_x <= x <= config.lidar_max_x) and (
                     config.lidar_min_y <= y <= config.lidar_max_y
             )

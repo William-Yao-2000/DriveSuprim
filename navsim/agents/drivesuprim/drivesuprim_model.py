@@ -8,8 +8,8 @@ from sklearn.cluster import KMeans
 import torch
 import torch.nn as nn
 
-from navsim.agents.hydra_ssl.hydra_backbone_pe_v_ssl import HydraBackbonePE
-from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
+from navsim.agents.drivesuprim.drivesuprim_backbone_pe import DriveSuprimBackbonePE
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
 from navsim.agents.transfuser.transfuser_model import AgentHead
 from navsim.agents.utils.attn import MemoryEffTransformer
 from navsim.agents.utils.nerf import nerf_positional_encoding
@@ -19,8 +19,8 @@ from navsim.agents.utils.nerf import nerf_positional_encoding
 # cnt = 0
 # import time
 
-class HydraModel(nn.Module):
-    def __init__(self, config: HydraConfigSSL):
+class DriveSuprimModel(nn.Module):
+    def __init__(self, config: DriveSuprimConfig):
         super().__init__()
 
         self._query_splits = [

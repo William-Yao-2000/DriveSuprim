@@ -10,17 +10,17 @@ import os
 import torch
 from torch import nn
 
-from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
-from navsim.agents.hydra_ssl.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
-from navsim.agents.hydra_ssl.layers import DINOHead
-from navsim.agents.hydra_ssl.utils.fsdp import get_fsdp_modules
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
+from navsim.agents.drivesuprim.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
+from navsim.agents.drivesuprim.layers import DINOHead
+from navsim.agents.drivesuprim.utils.fsdp import get_fsdp_modules
 
 
 logger = logging.getLogger("dinov2")
 
 
 class SSLMetaArch(nn.Module):
-    def __init__(self, cfg: HydraConfigSSL, teacher_model, student_model):
+    def __init__(self, cfg: DriveSuprimConfig, teacher_model, student_model):
         super().__init__()
         self.cfg = cfg
         self.fp16_scaler = None

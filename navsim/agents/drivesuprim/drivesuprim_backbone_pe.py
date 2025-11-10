@@ -1,30 +1,26 @@
 """
 Implements the TransFuser vision backbone.
 """
-
+import os
 import timm
+
 import torch
 from torch import nn
 
-from navsim.agents.hydra_plus.hydra_config import HydraConfig
-
 from navsim.agents.backbones.eva import EVAViT
-try:
-    from navsim.agents.backbones.internimage import InternImage
-    from navsim.agents.backbones.swin import SwinTransformerBEVFT
-    from navsim.agents.backbones.vov import VoVNet
-except:
-    print('mmcv not supported')
-
+from navsim.agents.backbones.internimage import InternImage
+from navsim.agents.backbones.swin import SwinTransformerBEVFT
+from navsim.agents.backbones.vov import VoVNet
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
 from navsim.agents.utils.vit import DAViT
 
 
-class HydraBackbone(nn.Module):
+class DriveSuprimBackbonePE(nn.Module):
     """
     Multi-scale Fusion Transformer for image + LiDAR feature fusion
     """
 
-    def __init__(self, config: HydraConfig):
+    def __init__(self, config: DriveSuprimConfig):
 
         super().__init__()
         self.config = config
@@ -33,8 +29,7 @@ class HydraBackbone(nn.Module):
             self.image_encoder = InternImage(init_cfg=dict(type='Pretrained',
                                                            checkpoint=config.intern_ckpt
                                                            ),
-                                             frozen_stages=2)
-            # scale_4_c = 2560
+                                                           frozen_stages=2)
             vit_channels = 2560
             self.image_encoder.init_weights()
         elif config.backbone_type == 'vov':
@@ -49,24 +44,23 @@ class HydraBackbone(nn.Module):
                     prefix='img_backbone.'
                 )
             )
-            # scale_4_c = 1024
             vit_channels = 1024
             self.image_encoder.init_weights()
         elif config.backbone_type == 'swin':
             self.image_encoder = SwinTransformerBEVFT(
                 with_cp=True,
                 convert_weights=False,
-                depths=[2, 2, 18, 2],
+                depths=[2,2,18,2],
                 drop_path_rate=0.35,
                 embed_dims=192,
                 init_cfg=dict(
                     checkpoint=config.swin_ckpt,
                     type='Pretrained'
                 ),
-                num_heads=[6, 12, 24, 48],
+                num_heads=[6,12,24,48],
                 out_indices=[3],
                 patch_norm=True,
-                window_size=[16, 16, 16, 16],
+                window_size=[16,16,16,16],
                 use_abs_pos_embed=True,
                 return_stereo_feat=False,
                 output_missing_index_as_none=False
@@ -75,12 +69,23 @@ class HydraBackbone(nn.Module):
         elif config.backbone_type == 'vit':
             self.image_encoder = DAViT(ckpt=config.vit_ckpt)
             vit_channels = 1024
-        elif config.backbone_type == 'resnet':
-            self.image_encoder = timm.create_model(
-                'resnet34', pretrained=False, features_only=True
-            )
-            vit_channels = 512
         elif config.backbone_type == 'sptr':
+            """
+            usage in config:
+
+            camera_width: 2048
+            camera_height: 512
+            img_vert_anchors: 16
+            img_horz_anchors: 64
+            backbone_type: 'sptr'
+            lr_mult_backbone: 0.1
+            sptr_ckpt: ${oc.env:OPENSCENE_DATA_ROOT}/models/sptr_vit.pth
+
+            # link for sptr_vit.pth: 
+            wget https://github.com/exiawsh/storage/releases/download/v1.0/repdetr3d_eva02_800_bs2_seq_24e.pth
+            mv repdetr3d_eva02_800_bs2_seq_24e.pth sptr_vit.pth
+            """
+
             img_vit_size = (config.camera_height, config.camera_width)
             self.image_encoder = EVAViT(
                 img_size=img_vit_size[0],  # img_size for short side
@@ -105,9 +110,18 @@ class HydraBackbone(nn.Module):
             )
             self.image_encoder.init_weights(config.sptr_ckpt)
             vit_channels = 1024
-
+        elif config.backbone_type == 'resnet34':
+            self.image_encoder = timm.create_model(
+                'resnet34', pretrained=False, features_only=True
+            )
+            vit_channels = 512
+        elif config.backbone_type == 'resnet50':
+            self.image_encoder = timm.create_model(
+                'resnet50', pretrained=False, features_only=True
+            )
+            vit_channels = 2048
         else:
-            raise ValueError('Unsupported backbone in hydra_backbone')
+            raise ValueError
 
         self.avgpool_img = nn.AdaptiveAvgPool2d(
             (self.config.img_vert_anchors, self.config.img_horz_anchors)
@@ -116,9 +130,10 @@ class HydraBackbone(nn.Module):
 
     def forward(self, image):
         B, C, H, W = image.shape
-        if self.backbone_type == 'vov':
+        if self.backbone_type == 'vov' or self.backbone_type == 'vit':
             image_features = self.image_encoder(image)[-1]
         elif self.backbone_type == 'sptr':
+            # split img into two patches
             half_w = W // 2
             image_left = image[..., :half_w]
             image_right = image[..., half_w:]
@@ -127,19 +142,22 @@ class HydraBackbone(nn.Module):
             image_features = torch.cat([
                 image_features_left, image_features_right
             ], -1)
-        elif self.backbone_type == 'vit':
-            quarter_w = W // 4
-            image_1 = image[..., :quarter_w]
-            image_2 = image[..., quarter_w:2 * quarter_w]
-            image_3 = image[..., 2 * quarter_w:3 * quarter_w]
-            image_4 = image[..., 3 * quarter_w:]
-            image_f_1 = self.image_encoder(image_1)[-1]
-            image_f_2 = self.image_encoder(image_2)[-1]
-            image_f_3 = self.image_encoder(image_3)[-1]
-            image_f_4 = self.image_encoder(image_4)[-1]
-            image_features = torch.cat([
-                image_f_1, image_f_2, image_f_3, image_f_4
-            ], -1)
         else:
             raise ValueError('Forward wrong backbone')
         return self.avgpool_img(image_features)
+
+    def forward_tup(self, image, **kwargs):
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+
+        if isinstance(self.image_encoder, DAViT):
+            image_feat_tup = self.image_encoder(image, **kwargs)[-1]
+        else:
+            image_feat = self.image_encoder(image)[-1]
+            class_feat = image_feat.mean(dim=(-1, -2))
+            image_feat_tup = (image_feat, class_feat)
+        
+        if self.config.lab.use_higher_res_feat_in_refinement:
+            return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1], image_feat_tup[0])
+        else:
+            return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1])

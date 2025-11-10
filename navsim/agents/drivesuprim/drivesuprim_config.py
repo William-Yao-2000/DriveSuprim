@@ -133,7 +133,7 @@ class LabConfig:
 
 
 @dataclass
-class HydraConfigSSL(TransfuserConfig):
+class DriveSuprimConfig(TransfuserConfig):
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0
     trajectory_pdm_weight = {
