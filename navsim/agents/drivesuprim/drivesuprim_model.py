@@ -1,10 +1,10 @@
-from typing import Dict, List
-import os, pickle
 import copy
 from itertools import combinations
-
 import numpy as np
+import os, pickle
 from sklearn.cluster import KMeans
+from typing import Dict, List
+
 import torch
 import torch.nn as nn
 
@@ -15,32 +15,22 @@ from navsim.agents.utils.attn import MemoryEffTransformer
 from navsim.agents.utils.nerf import nerf_positional_encoding
 
 
-# inference_time = 0.0
-# cnt = 0
-# import time
-
 class DriveSuprimModel(nn.Module):
     def __init__(self, config: DriveSuprimConfig):
         super().__init__()
-
-        self._query_splits = [
-            config.num_bounding_boxes,
-        ]
 
         self._config = config
         assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet34', 'resnet50', 'eva', 'moe', 'moe_ult32', 'swin', 'sptr']
         if config.backbone_type == 'eva':
             raise ValueError(f'{config.backbone_type} not supported')
-        elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or \
-            config.backbone_type == 'swin' or config.backbone_type == 'vit' or config.backbone_type in ('resnet34', 'resnet50') or \
-            config.backbone_type == 'sptr':
-            self._backbone = HydraBackbonePE(config)
+        elif config.backbone_type == 'intern' or config.backbone_type == 'vov' or config.backbone_type == 'swin' or config.backbone_type == 'vit' or \
+             config.backbone_type in ('resnet34', 'resnet50') or config.backbone_type == 'sptr':
+            self._backbone = DriveSuprimBackbonePE(config)
 
-        img_num = 2 if config.use_back_view else 1
-        # import pdb; pdb.set_trace()
+        img_num = 1
         self._keyval_embedding = nn.Embedding(
             config.img_vert_anchors * config.img_horz_anchors * img_num, config.tf_d_model
-        )  # 8x8 feature grid + trajectory
+        )
         # self._query_embedding = nn.Embedding(sum(self._query_splits), config.tf_d_model)
 
         # usually, the BEV features are variable in size.
@@ -62,8 +52,8 @@ class DriveSuprimModel(nn.Module):
 
         self.use_multi_stage = self._config.refinement.use_multi_stage
         if self.use_multi_stage:
-            if self._config.refinement.refinement_approach == 'offset_decoder':
-                self._trajectory_offset_head = TrajOffsetHead(
+            if self._config.refinement.refinement_approach == 'transformer_decoder':
+                self._trajectory_offset_head = RefineTrajHead(
                     d_ffn=config.tf_d_ffn,
                     d_model=config.tf_d_model,
                     nhead=config.vadv2_head_nhead,
@@ -76,118 +66,57 @@ class DriveSuprimModel(nn.Module):
             else:
                 raise NotImplementedError
 
-        if self._config.lab.check_top_k_traj:
-            self.test_full_vocab_pdm_score = pickle.load(
-                open(self._config.lab.test_full_vocab_pdm_score_path, 'rb'))
-
-    def img_feat_blc(self, camera_feature):
-        img_features = self._backbone(camera_feature)  # [b, c_img, h//32, w//32]
-        img_features = self.downscale_layer(img_features).flatten(-2, -1)  # [b, c, h//32 * w//32]
-        img_features = img_features.permute(0, 2, 1)  # [b, h//32 * w//32, c]
-        return img_features
-
     def img_feat_blc_dict(self, camera_feature, **kwargs):
-        img_feat_tup = self._backbone.forward_tup(camera_feature, **kwargs)
+        img_features = self._backbone(camera_feature, **kwargs)
         img_feat_dict = {
-            'patch_token': img_feat_tup[0],  # [b, c_img, h//32, w//32], the patch size of vit is only 16, but use a avg pooling
-            'class_token': img_feat_tup[1],
+            'patch_token': img_features,  # [bs, c_img, h//32, w//32]
         }
-        if self._config.lab.use_higher_res_feat_in_refinement:
-            img_feat_dict['higher_res_feat'] = img_feat_tup[2]
-        img_features = img_feat_dict['patch_token']
-        img_features = self.downscale_layer(img_features).flatten(-2, -1)  # [b, c, h//32 * w//32]
-        img_features = img_features.permute(0, 2, 1)  # [b, h//32 * w//32, c]
+        img_features = self.downscale_layer(img_features).flatten(-2, -1)  # [bs, c, h//32 * w//32]
+        img_features = img_features.permute(0, 2, 1)  # [bs, h//32 * w//32, c]
         img_feat_dict['avg_feat'] = img_features
         return img_feat_dict
 
-    def forward_features_list(self, x_list, mask_list):
-        return [self.forward(x, m) for x, m in zip(x_list, mask_list)]
+    def forward_features_list(self, x_list):
+        return [self.forward(x) for x in x_list]
 
     def forward(self,
                 features: Dict[str, torch.Tensor],
                 masks=None,
-                interpolated_traj=None,
                 tokens=None) -> Dict[str, torch.Tensor]:
         
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
-        # global inference_time, cnt
-        # start_time = time.time()
         
         output: Dict[str, torch.Tensor] = {}
 
-        camera_feature: torch.Tensor = features["camera_feature"]  # List[torch.Tensor], len == seq_len, tensor.shape == [b, 3, h, w]
-        status_feature: torch.Tensor = features["status_feature"][0]  # List[torch.Tensor], len == seq_len, tensor.shape == [b, 8] (the [0] picks present status)
+        camera_feature: List[torch.Tensor] = features["camera_feature"]  # List[torch.Tensor], len == seq_len, tensor.shape == [bs, 3, h, w]
+        status_feature: torch.Tensor = features["status_feature"][0]  # tensor.shape == [bs, 8] (features["status_feature"][0] picks present status)
         if isinstance(camera_feature, list):
-            camera_feature = camera_feature[-1]  # [b, 3, h, w]
-        # todo temp fix!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # status_feature[:, 0] = 0.0
-        # status_feature[:, 1] = 1.0
-        # status_feature[:, 2] = 0.0
-        # status_feature[:, 3] = 0.0
-        
-        batch_size = status_feature.shape[0]
-        
+            camera_feature = camera_feature[-1]  # [bs, 3, h, w], [-1] means present frame camera input
+
         img_feat_dict = self.img_feat_blc_dict(camera_feature, masks=masks, return_class_token=True)
-        if self._config.use_back_view:
-            img_features_back = self.img_feat_blc(features["camera_feature_back"])
-            img_features = torch.cat([img_features, img_features_back], 1)
 
-        if self._config.num_ego_status == 1 and status_feature.shape[1] == 32:
-            status_encoding = self._status_encoding(status_feature[:, :8])
-        else:
-            status_encoding = self._status_encoding(status_feature)  # [b, 8] -> [b, c]
+        status_encoding = self._status_encoding(status_feature)  # [bs, 8] -> [bs, c]
 
-        keyval = img_feat_dict.pop('avg_feat')  # [b, h//32 * w//32, c]
-        keyval += self._keyval_embedding.weight[None, ...]  # [b, h//32 * w//32, c]
-
-        # query = self._query_embedding.weight[None, ...].repeat(batch_size, 1, 1)
-        # agents_query = self._tf_decoder(query, keyval)
+        keyval = img_feat_dict.pop('avg_feat')  # [bs, h//32 * w//32, c]
+        keyval += self._keyval_embedding.weight[None, ...]  # [bs, h//32 * w//32, c]
 
         output.update(img_feat_dict)
-        trajectory = self._trajectory_head(keyval, status_encoding, interpolated_traj, tokens=tokens)
-
-        # zxli: early return without second stage
-        if self._trajectory_head.dp_preds is not None:
-            output.update(trajectory)
-            return output
+        trajectory = self._trajectory_head(keyval, status_encoding, tokens=tokens)
 
         if self.use_multi_stage:
-            if self._config.lab.use_higher_res_feat_in_refinement:
-                bev_feat_fg = img_feat_dict['higher_res_feat']
-            else:
-                bev_feat_fg = img_feat_dict['patch_token']  # [bs, c_vit, w, h]
-            final_traj, filtered_scores = self._trajectory_offset_head(bev_feat_fg, trajectory['refinement'])
+            img_feat = img_feat_dict['patch_token']  # [bs, c_vit, w, h]
+            final_traj = self._trajectory_offset_head(img_feat, trajectory['refinement'])
             trajectory['final_traj'] = final_traj
-            trajectory['filtered_final_scores'] = filtered_scores
-            
-
-        if self._config.lab.check_top_k_traj:
-            topk_selected_indices_bs = trajectory['topk_selected_indices']
-            for i, (token, topk_selected_indices) in enumerate(zip(tokens, topk_selected_indices_bs)):
-                # Get the scores for the topk trajectories
-                topk_indices_cpu = topk_selected_indices.cpu().numpy()
-                scores = self.test_full_vocab_pdm_score[token]['total'][topk_indices_cpu]
-                best_idx = np.argmax(scores)
-                # Update the trajectory for this sample to the best one according to PDM score
-                trajectory['trajectory'][i] = trajectory["topk_trajs"][i][best_idx]
 
         output.update(trajectory)
-        # agents = self._agent_head(agents_query)
-        # output.update(agents)
-        # end_time = time.time()
-        # cnt += 1
-        # if cnt > 16:
-        #     inference_time += (end_time - start_time)
-        #     print(f'Inference time: {end_time - start_time:.4f}s, Average inference time: {inference_time / (cnt - 16):.4f}s')
-        #     print(f'Average FPS: {1.0 / (inference_time / (cnt - 16)):.4f}')
 
         return output
 
 
 class HydraTrajHead(nn.Module):
     def __init__(self, num_poses: int, d_ffn: int, d_model: int, vocab_path: str,
-                 nhead: int, nlayers: int, config: HydraConfigSSL = None
+                 nhead: int, nlayers: int, config: DriveSuprimConfig = None
                  ):
         super().__init__()
         self._config = config
@@ -254,17 +183,9 @@ class HydraTrajHead(nn.Module):
             )
         })
 
-        if self._config.lab.optimize_prev_frame_traj_for_ec:
-            self.heads['imi_prev'] = nn.Sequential(
-                nn.Linear(d_model, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, 1),
-            )
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
 
-        self.inference_imi_weight = config.inference_imi_weight
-        self.inference_da_weight = config.inference_da_weight
         self.normalize_vocab_pos = config.normalize_vocab_pos
         if self.normalize_vocab_pos:
             self.encoder = MemoryEffTransformer(
@@ -273,75 +194,31 @@ class HydraTrajHead(nn.Module):
                 dim_feedforward=d_model * 4,
                 dropout=0.0
             )
-        self.use_nerf = config.use_nerf
 
-        if self.use_nerf:
-            self.pos_embed = nn.Sequential(
-                nn.Linear(1040, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, d_model),
-            )
-        else:
-            self.pos_embed = nn.Sequential(
-                nn.Linear(num_poses * 3, d_ffn),
-                nn.ReLU(),
-                nn.Linear(d_ffn, d_model),
-            )
-        # zxli: load dp proposals
-        dp_preds_path = os.getenv('DP_PREDS', None)
-        if dp_preds_path is not None:
-            print(f'Loading DP PREDS from {dp_preds_path}')
-            self.dp_preds = pickle.load(open(dp_preds_path, 'rb'))
-        else:
-            self.dp_preds = None
+        self.pos_embed = nn.Sequential(
+            nn.Linear(num_poses * 3, d_ffn),
+            nn.ReLU(),
+            nn.Linear(d_ffn, d_model),
+        )
 
-    def forward(self, bev_feature, status_encoding, interpolated_traj=None, tokens=None) -> Dict[str, torch.Tensor]:
-        # todo sinusoidal embedding
-        # vocab: 4096, 40, 3
-        # bev_feature: B, 32, C
-        # embedded_vocab: B, 4096, C
-        vocab = self.vocab.data
-        L, HORIZON, _ = vocab.shape
-        B = bev_feature.shape[0]
-        if self.use_nerf:
-            vocab = torch.cat(
-                [
-                    nerf_positional_encoding(vocab[..., :2]),
-                    torch.cos(vocab[..., -1])[..., None],
-                    torch.sin(vocab[..., -1])[..., None],
-                ], dim=-1
-            )
-
-        if self.dp_preds is None:
-            if self.normalize_vocab_pos:
-                embedded_vocab = self.pos_embed(vocab.view(L, -1))[None]
-                embedded_vocab = self.encoder(embedded_vocab).repeat(B, 1, 1)
-            else:
-                embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)  # [b, n_vocab, c]
-        else:
-            # zxli: combined inference with dp
-            curr_dp_preds = []
-            for token in tokens:
-                curr_dp_preds.append(torch.from_numpy(self.dp_preds[token]['interpolated_proposal']).float().to(bev_feature.device)[None])
-            # B, N, 40, 3
-            curr_dp_preds = torch.cat(curr_dp_preds, 0)
-            NUM_PROPOSALS = curr_dp_preds.shape[1]
-            dp_proposals = curr_dp_preds.view(B, NUM_PROPOSALS, -1)
-            vocab = torch.cat([
-                vocab.view(L, -1)[None].repeat(B, 1, 1),
-                dp_proposals
-            ], 1)
-            embedded_vocab = self.pos_embed(vocab)
-            embedded_vocab = self.encoder(embedded_vocab)
-            # end of combined inference with dp
+    def forward(self, img_feature, status_encoding, tokens=None) -> Dict[str, torch.Tensor]:
 
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
-        tr_out = self.transformer(embedded_vocab, bev_feature)  # [b, n_vocab, c]
-        dist_status = tr_out + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
+        vocab = self.vocab.data  # [n_vocab, 40, 3]
+        L, HORIZON, _ = vocab.shape
+        B = img_feature.shape[0]
+
+        if self.normalize_vocab_pos:
+            embedded_vocab = self.pos_embed(vocab.view(L, -1))[None]  # [1, n_vocab, c]
+            embedded_vocab = self.encoder(embedded_vocab).repeat(B, 1, 1)  # [bs, n_vocab, c]
+        else:
+            embedded_vocab = self.pos_embed(vocab.view(L, -1))[None].repeat(B, 1, 1)
+
+        tr_out = self.transformer(embedded_vocab, img_feature)  # [bs, n_vocab, c]
+        dist_status = tr_out + status_encoding.unsqueeze(1)  # [bs, n_vocab, c]
         result = {}
-        # BUG!!!!!!!! (FIXED in 2025.04.21)
         for k, head in self.heads.items():
             result[k] = head(dist_status).squeeze(-1)
 
@@ -355,30 +232,15 @@ class HydraTrajHead(nn.Module):
                    5.0 * result['ego_progress'].sigmoid() +
                    2.0 * result['lane_keeping'].sigmoid() +
                    1.0 * result['history_comfort'].sigmoid()
-                   ).log()
-        )
-
-        # zxli: return without second stage
-        if self.dp_preds is not None:
-            # scores = scores[:, L:]
-            selected_indices = scores.argmax(1)
-            scene_cnt_tensor = torch.arange(B, device=scores.device)
-            result["trajectory"] = vocab[scene_cnt_tensor, selected_indices].view(B, HORIZON, 3)
-            return result
-
-        if self._config.lab.optimize_prev_frame_traj_for_ec:
-            scores += 0.008 * result['imi_prev'].softmax(-1).log()
+                  ).log()
+        )  # [bs, n_vocab]
         
         selected_indices = scores.argmax(1)
         result["trajectory"] = self.vocab.data[selected_indices]
         result["trajectory_vocab"] = self.vocab.data
         result["selected_indices"] = selected_indices
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
-
         if self._config.refinement.use_multi_stage:
-            assert self._config.lab.check_top_k_traj is False
             topk_str = str(self._config.refinement.topks)
             topk = int(topk_str.split('+')[0])
             topk_values, topk_indices = torch.topk(scores, k=topk, dim=1)
@@ -389,76 +251,38 @@ class HydraTrajHead(nn.Module):
             batch_indices = torch.arange(B, device=topk_indices.device).view(-1, 1).expand(-1, topk)
             _dict["trajs_status"] = dist_status[batch_indices, topk_indices]
             _dict['indices_absolute'] = topk_indices
-            
+
             # Store the scores for each top-k trajectory
             _dict['coarse_score'] = {}
             for score_key in self.heads.keys():
                 _dict['coarse_score'][score_key] = result[score_key][batch_indices, topk_indices]
-            
-            if self._config.refinement.traj_expansion_in_infer and not self._config.training:
-                self.forward_refinement_infer_expansion(bev_feature, status_encoding, _dict)
 
             result['refinement'].append(_dict)
-
-        # debug
-        if self._config.lab.check_top_k_traj:
-            topk = self._config.lab.num_top_k
-            top_values, top_indices = torch.topk(scores, k=topk, dim=1)
-            result["topk_trajs"] = self.vocab.data[top_indices]
-            result["topk_selected_indices"] = top_indices
         
         return result
-    
-    def forward_refinement_infer_expansion(self, bev_feature, status_encoding, dict_first_stage):
-        trajs = dict_first_stage['trajs']
-        n_total_traj = self._config.refinement.n_total_traj
-
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
-        
-        interp_trajs = cluster_interp_tensor_batch(trajs, n_total_traj-trajs.shape[1])
-        B, L, HORIZON, _ = interp_trajs.shape
-        embedded_interb_vocab = self.pos_embed(interp_trajs.view(B, L, -1))
-        embedded_interb_vocab = self.encoder(embedded_interb_vocab)
-        tr_out_interb = self.transformer(embedded_interb_vocab, bev_feature)
-        
-        dist_status_interb = tr_out_interb + status_encoding.unsqueeze(1)  # [b, n_vocab, c]
-        score_interb = {}
-        for k, head in self.heads.items():
-            score_interb[k] = head(dist_status_interb).squeeze(-1)
-        
-        dict_first_stage['trajs'] = torch.cat([dict_first_stage['trajs'], interp_trajs], dim=1)
-        dict_first_stage['trajs_status'] = torch.cat([dict_first_stage['trajs_status'], dist_status_interb], dim=1)
-        indices_absolute = dict_first_stage['indices_absolute']
-        indices_interb = torch.arange(self.vocab.shape[0], self.vocab.shape[0] + L).unsqueeze(0).expand(B, L).to(indices_absolute)
-        dict_first_stage['indices_absolute'] = torch.cat([indices_absolute, indices_interb], dim=1)
-        for k in self.heads.keys():
-            dict_first_stage['coarse_score'][k] = torch.cat([dict_first_stage['coarse_score'][k], score_interb[k]], dim=1)
 
 
-class TrajOffsetHead(nn.Module):
+class RefineTrajHead(nn.Module):
     def __init__(self, d_ffn: int, d_model: int, nhead: int, d_backbone: int,
                  num_stage: int, stage_layers: str, topks: str,
-                 config: HydraConfigSSL = None
+                 config: DriveSuprimConfig = None
                  ):
         super().__init__()
 
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
+        
         stage_layers = str(stage_layers)
         topks = str(topks)
         
         self._config = config
-        self.num_stage = num_stage
+        self.num_stage = num_stage  # the number of **refinement** stages, we choose to use only 1 refinement stage (8192->256)
         self.stage_layers = [int(sl) for sl in stage_layers.split('+')]
         self.topks = [int(topk) for topk in topks.split('+')]
         assert len(self.stage_layers) == num_stage and len(self.topks) == num_stage
-        self.nlayers = sum(self.stage_layers)
+        # self.nlayers = sum(self.stage_layers)
 
         self.use_mid_output = config.refinement.use_mid_output
-        self.use_offset_refinement = config.refinement.use_offset_refinement_v2
-        if self.use_offset_refinement:
-            assert self.use_mid_output == True
         self.use_separate_stage_heads = config.refinement.use_separate_stage_heads
 
         downscale_layer = nn.Conv2d(d_backbone, d_model, kernel_size=1)
@@ -475,109 +299,52 @@ class TrajOffsetHead(nn.Module):
         ) for layer in self.stage_layers]
         self.transformer_blocks = nn.ModuleList(transformer_blocks)
 
-
-        assert self._config.lab.refinement_metrics in ('all', 'dac_ep_lk', 'dac_ep_lk_pdms')
-        refinement_metrics = self._config.lab.refinement_metrics
-        if refinement_metrics == 'all':
-            heads = nn.ModuleDict({
-                'no_at_fault_collisions': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'drivable_area_compliance':
-                    nn.Sequential(
-                        nn.Linear(d_model, d_ffn),
-                        nn.ReLU(),
-                        nn.Linear(d_ffn, 1),
-                    ),
-                'time_to_collision_within_bound': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'ego_progress': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'driving_direction_compliance': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'lane_keeping': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'traffic_light_compliance': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'history_comfort': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-            })
-        elif refinement_metrics == 'dac_ep_lk':
-            heads = nn.ModuleDict({
-                'drivable_area_compliance':
-                    nn.Sequential(
-                        nn.Linear(d_model, d_ffn),
-                        nn.ReLU(),
-                        nn.Linear(d_ffn, 1),
-                ),
-                'ego_progress': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'lane_keeping': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-            })
-        elif refinement_metrics == 'dac_ep_lk_pdms':
-            heads = nn.ModuleDict({
-                'drivable_area_compliance':
-                    nn.Sequential(
-                        nn.Linear(d_model, d_ffn),
-                        nn.ReLU(),
-                        nn.Linear(d_ffn, 1),
-                ),
-                'ego_progress': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'lane_keeping': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-                'pdm_score': nn.Sequential(
-                    nn.Linear(d_model, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, d_ffn),
-                    nn.ReLU(),
-                    nn.Linear(d_ffn, 1),
-                ),
-            })
-        
-        if self._config.lab.use_imi_learning_in_refinement:
-            heads['imi'] = nn.Sequential(
+        heads = nn.ModuleDict({
+            'no_at_fault_collisions': nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
-                nn.Linear(d_ffn, d_ffn),
+                nn.Linear(d_ffn, 1),
+            ),
+            'drivable_area_compliance':
+                nn.Sequential(
+                    nn.Linear(d_model, d_ffn),
+                    nn.ReLU(),
+                    nn.Linear(d_ffn, 1),
+                ),
+            'time_to_collision_within_bound': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, 1),
-            )
-        if self._config.lab.optimize_prev_frame_traj_for_ec:
-            heads['imi_prev'] = nn.Sequential(
+            ),
+            'ego_progress': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'driving_direction_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'lane_keeping': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'traffic_light_compliance': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+            'history_comfort': nn.Sequential(
+                nn.Linear(d_model, d_ffn),
+                nn.ReLU(),
+                nn.Linear(d_ffn, 1),
+            ),
+        })
+
+        if self._config.lab.use_imi_learning_in_refinement:
+            heads['imi'] = nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
                 nn.Linear(d_ffn, d_ffn),
@@ -590,7 +357,6 @@ class TrajOffsetHead(nn.Module):
         else:
             self.multi_stage_heads = nn.ModuleList([heads for _ in range(num_stage)])
 
-        self.inference_da_weight = config.inference_da_weight
         self.normalize_vocab_pos = config.normalize_vocab_pos
         if self.normalize_vocab_pos:
             self.encoder = MemoryEffTransformer(
@@ -600,38 +366,25 @@ class TrajOffsetHead(nn.Module):
                 dropout=0.0
             )
 
-    def forward(self, bev_feat_fg, refinement_dict) -> Dict[str, torch.Tensor]:
-        # bev_feature_fg (bev_feature_fine_grained): bs, c_vit, h, w
-        # status_encoding: bs, topk, c
-        # coarse_scores: dict
+    def forward(self, img_feat, refinement_dict) -> Dict[str, torch.Tensor]:
 
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
-        B = bev_feat_fg.shape[0]
+        B = img_feat.shape[0]
         
         for i in range(self.num_stage):
-            _bev_feat_fg = self.downscale_layers[i](bev_feat_fg).flatten(2)
-            _bev_feat_fg = _bev_feat_fg.permute(0, 2, 1)  # FIXBUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            _img_feat_fg = self.downscale_layers[i](img_feat).flatten(2)
+            _img_feat_fg = _img_feat_fg.permute(0, 2, 1)  # [bs, h//32 * w//32, c]
             status_encoding = refinement_dict[-1]['trajs_status']  # [bs, topk_stage_i, c]
-            tr_out_lst = self.transformer_blocks[i](status_encoding, _bev_feat_fg)  # [layer_stage_i, bs, topk_stage_i, c]
+            tr_out_lst = self.transformer_blocks[i](status_encoding, _img_feat_fg)  # [layer_stage_i, bs, topk_stage_i, c]
 
-            # Compute scores for each layer
+            # Compute scores for each refinement decoder layer
             layer_results = []
-            # Initialize reference scores from coarse_score
-            if self.use_offset_refinement:
-                reference = refinement_dict[-1]['coarse_score']
             for j, dist_status in enumerate(tr_out_lst):
                 layer_result = {}
                 for k, head in self.multi_stage_heads[i].items():
-                    if self.use_offset_refinement:
-                        # Compute offset
-                        offset = head(dist_status).squeeze(-1)
-                        layer_result[k] = reference[k] + offset
-                        # Update reference for next layer
-                        reference[k] = layer_result[k]
-                    else:
-                        layer_result[k] = head(dist_status).squeeze(-1)
+                    layer_result[k] = head(dist_status).squeeze(-1)
                 layer_results.append(layer_result)
             
             if not self.use_mid_output:
@@ -639,69 +392,41 @@ class TrajOffsetHead(nn.Module):
             refinement_dict[-1]['layer_results'] = layer_results
             
             last_layer_result = layer_results[-1]
-            refinement_metrics = self._config.lab.refinement_metrics
-            if refinement_metrics == 'all':
-                if self._config.lab.adjust_refinement_score_weight:
-                    revised_times = 3.0
-                else:
-                    revised_times = 1.0
-                scores = (
-                    0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
-                    0.5 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
-                    revised_times * 0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
-                    0.3 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
-                    6.0 * (5.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
-                        revised_times * 5.0 * last_layer_result['ego_progress'].sigmoid() +
-                        revised_times * 2.0 * last_layer_result['lane_keeping'].sigmoid() +
-                        1.0 * last_layer_result['history_comfort'].sigmoid()
-                        ).log()
-                )
-            elif refinement_metrics == 'dac_ep_lk':
-                scores = (
-                    0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
-                    6.0 * (
-                        5.0 * last_layer_result['ego_progress'].sigmoid() +
-                        2.0 * last_layer_result['lane_keeping'].sigmoid()
-                        ).log()
-                )
-            elif refinement_metrics == 'dac_ep_lk_pdms':
-                scores = (
-                    0.4 * last_layer_result['pdm_score'].sigmoid().log() +
-                    0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
-                    6.0 * (
-                        5.0 * last_layer_result['ego_progress'].sigmoid() +
-                        2.0 * last_layer_result['lane_keeping'].sigmoid()
-                        ).log()
-                )
+
+            scores = (
+                0.1 * last_layer_result['traffic_light_compliance'].sigmoid().log() +
+                0.5 * last_layer_result['no_at_fault_collisions'].sigmoid().log() +
+                0.5 * last_layer_result['drivable_area_compliance'].sigmoid().log() +
+                0.3 * last_layer_result['driving_direction_compliance'].sigmoid().log() +
+                6.0 * (5.0 * last_layer_result['time_to_collision_within_bound'].sigmoid() +
+                       5.0 * last_layer_result['ego_progress'].sigmoid() +
+                       2.0 * last_layer_result['lane_keeping'].sigmoid() +
+                       1.0 * last_layer_result['history_comfort'].sigmoid()
+                      ).log()
+            )
+
             if self._config.lab.use_imi_learning_in_refinement:
                 scores += 0.02 * last_layer_result['imi'].softmax(-1).log()
-            if self._config.lab.optimize_prev_frame_traj_for_ec:
-                scores += 0.008 * last_layer_result['imi_prev'].softmax(-1).log()
 
             if i != self.num_stage-1:
-                _next_layer_dict = {}
                 _next_topk = self.topks[i+1]
                 _, select_indices = torch.topk(scores, k=_next_topk, dim=1)
                 batch_indices = torch.arange(B, device=select_indices.device).view(-1, 1).expand(-1, _next_topk)
 
+                _next_layer_dict = {}
                 _next_layer_dict["trajs"] = refinement_dict[-1]['trajs'][batch_indices, select_indices]
                 _next_layer_dict["trajs_status"] = tr_out_lst[-1][batch_indices, select_indices]
                 _next_layer_dict['indices_absolute'] = refinement_dict[-1]['indices_absolute'][batch_indices, select_indices]
-                if self.use_offset_refinement:
-                    _next_layer_dict['coarse_score'] = {}
-                    for score_key in self.multi_stage_heads[0].keys():
-                        _next_layer_dict['coarse_score'][score_key] = last_layer_result[score_key][batch_indices, select_indices]
-                
                 refinement_dict.append(_next_layer_dict)
             
             else:
                 select_indices = scores.argmax(1)
                 batch_indices = torch.arange(B, device=select_indices.device)
-                final_traj = refinement_dict[-1]['trajs'][batch_indices, select_indices]
-                filtered_scores = scores
+                final_traj = refinement_dict[-1]['trajs'][batch_indices, select_indices]  # [bs, 40, 3]
+                # filtered_scores = scores
         
-        return final_traj, filtered_scores
-    
+        return final_traj
+
 
 class TransformerDecoder_v2(nn.TransformerDecoder):
 
@@ -715,55 +440,6 @@ class TransformerDecoder_v2(nn.TransformerDecoder):
                          memory_mask=memory_mask,
                          tgt_key_padding_mask=tgt_key_padding_mask,
                          memory_key_padding_mask=memory_key_padding_mask)
-            
             output_lst.append(output)
 
         return output_lst
-
-def _inverse_sigmoid(x, eps=1e-5):
-    x = x.clamp(min=0, max=1)
-    x1 = x.clamp(min=eps)
-    x2 = (1 - x).clamp(min=eps)
-    return torch.log(x1/x2)
-
-
-def cluster_interp_tensor_batch(trajs_tensor, target_num=1024, alpha_list=[0.25, 0.5, 0.75]):
-    """
-    trajs_tensor: [bs, topk, 40, 3]
-    return: [bs, target_num, 40, 3]
-    """
-    assert trajs_tensor.ndim == 4 and trajs_tensor.shape[-2:] == (40, 3), "Input must be [bs, topk, 40, 3]"
-    bs, N, T, D = trajs_tensor.shape
-    device = trajs_tensor.device
-    result = []
-
-    n_clusters = int((target_num * 2 / len(alpha_list)) ** 0.5)+1
-
-    for b in range(bs):
-        trajs_np = trajs_tensor[b].cpu().numpy()  # [N, 40, 3]
-        flat = trajs_np.reshape(N, -1)
-
-        kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=5).fit(flat)
-        centers = torch.tensor(kmeans.cluster_centers_.reshape(n_clusters, T, D), dtype=trajs_tensor.dtype)
-
-        # 组合 (i, j)
-        pair_indices = list(combinations(range(n_clusters), 2))
-        pair_i = torch.tensor([i for i, j in pair_indices])
-        pair_j = torch.tensor([j for i, j in pair_indices])
-
-        interpolated = []
-        for alpha in alpha_list:
-            interp = (1 - alpha) * centers[pair_i] + alpha * centers[pair_j]  # [num_pairs, 40, 3]
-            interpolated.append(interp)
-
-        all_interp = torch.cat(interpolated, dim=0)  # [M, 40, 3]
-
-        if all_interp.shape[0] >= target_num:
-            final = all_interp[:target_num]
-        else:
-            repeat_factor = (target_num + all_interp.shape[0] - 1) // all_interp.shape[0]
-            final = all_interp.repeat((repeat_factor, 1, 1))[:target_num]
-
-        result.append(final)
-
-    return torch.stack(result, dim=0).to(device)  # [bs, target_num, 40, 3]

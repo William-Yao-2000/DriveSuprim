@@ -378,10 +378,10 @@ debug (只是为了测试，有可能参数之间并没有相符/对齐)
 teacher + student, ori input + rotate input (3-ensemble)
 其实跟上面没什么变化，只是代码变了
 ```bash
-CUDA_VISIBLE_DEVICES=1 HYDRA_FULL_ERROR=1 \
+CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
 python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=true \
-    agent=hydra_img_r34_ssl \
+    agent=drivesuprim_agent_r34 \
     experiment_name=debug \
     split=trainval \
     train_test_split=navtrain_debug \
@@ -401,8 +401,6 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.refinement.num_refinement_stage=1 \
     agent.config.refinement.stage_layers=3 \
     agent.config.refinement.topks=256 \
-    agent.config.lab.ban_soft_label_loss=True \
-    agent.config.lab.use_label_smoothing=True \
     agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-trans_0-va_0.0-p_0.5-ensemble_debug/split_pickles \
     cache_path=null

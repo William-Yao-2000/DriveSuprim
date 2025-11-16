@@ -1,16 +1,12 @@
-import os, time
-import pickle
-from typing import Dict, Tuple, List, Optional
+import os
+from typing import Dict, Tuple
 
-import numpy as np
 import pytorch_lightning as pl
 import torch
-from nuplan.common.actor_state.ego_state import EgoState
-from nuplan.common.actor_state.state_representation import StateSE2, TimePoint, StateVector2D
+from torch import Tensor
+
 from nuplan.common.actor_state.vehicle_parameters import get_pacifica_parameters
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
-from torch import Tensor
-import torch.nn.functional as F
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
@@ -53,11 +49,9 @@ class AgentLightningModuleSSL(pl.LightningModule):
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
-        teacher_pred, student_preds, loss_dict = self.agent.forward(batch)
-        if self._cfg.lab.optimize_prev_frame_traj_for_ec:
-            teacher_pred_dict = teacher_pred
-            teacher_pred = teacher_pred_dict['cur']
+        teacher_pred, student_preds = self.agent.forward(batch)
 
+        # compute loss for student (using ground truth)
         loss_student = self.agent.compute_loss(features, targets, student_preds, tokens)
 
         ori_loss = loss_student['ori']
@@ -72,18 +66,14 @@ class AgentLightningModuleSSL(pl.LightningModule):
                 self.log(f"{logging_prefix}/{k}-aug", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             self.log(f"{logging_prefix}/loss-aug", aug_loss[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + aug_loss[0]
-        
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
 
+        # compute loss for student (using teacher soft label)
         if not self._cfg.lab.ban_soft_label_loss:
             loss_soft_teacher = self.agent.compute_loss_soft_teacher(teacher_pred, student_preds[0], targets, tokens)
             for k, v in loss_soft_teacher[1].items():
                 self.log(f"{logging_prefix}/{k}-soft", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             self.log(f"{logging_prefix}/loss-soft", loss_soft_teacher[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
             loss = loss + loss_soft_teacher[0]
-
-        loss += student_preds[0]['cls_token_after_head'].sum() * 0.0  # TODO: fix
 
         if self._cfg.refinement.use_multi_stage:
             loss_refinement = self.agent.compute_loss_multi_stage(features, targets, student_preds, tokens)

@@ -42,13 +42,11 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
-        # TODO: translation
         config_rotation = config.ego_perturb.rotation
-        # TODO: what to decide training?
-        if self._config.training:
+        if self.training:
             with open(config.ego_perturb.offline_aug_file, 'r') as f:
                 aug_data = json.load(f)
-            assert aug_data['param']['rot'] == config_rotation.offline_aug_angle_boundary  # TODO: translation boundary
+            assert aug_data['param']['rot'] == config_rotation.offline_aug_angle_boundary
             self.aug_info = aug_data['tokens']
 
         color_jittering = transforms.Compose(
@@ -80,25 +78,6 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
                 GaussianBlur(p=0.5),
             ]
         )
-        
-        # TODO: 先把旋转搞定，va 和天气什么的后面再说
-        self.va_perturb_enable = config.ego_perturb.va.enable
-
-        config_camera = config.camera_problem
-        self.gaussian_enable = config_camera.gaussian_enable
-        self.gaussian_mode = config_camera.gaussian_mode
-        assert self.gaussian_mode in ('random', 'load_from_offline')
-        if self.gaussian_enable and self.gaussian_mode == 'load_from_offline':
-            with open(config.camera_problem.gaussian_offline_file) as f:
-                gaussian_data = json.load(f)
-            self.gaussian_info = gaussian_data['tokens']
-
-        self.weather_enable = config.camera_problem.weather_enable
-        if self.weather_enable:
-            self.weather_aug_mode = config.camera_problem.weather_aug_mode
-            assert self.weather_aug_mode in ('random', 'load_from_offline')
-            if self.weather_aug_mode == 'load_from_offline':
-                assert self.training is False
 
     def get_unique_name(self) -> str:
         """Inherited, see superclass."""
@@ -117,27 +96,18 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
             n_rotated = self._config.student_rotation_ensemble
         else:
             n_rotated = 0
-        features.update(self._get_camera_feature(agent_input, initial_token, rotation_num=n_rotated))  # List[torch.Tensor], tensor.shape == [c, h, w]
-        if self._config.use_back_view:
-            features["camera_feature_back"] = self._get_camera_feature_back(agent_input)
+        features.update(self._get_camera_feature(agent_input, initial_token, rotation_num=n_rotated))
 
-        if self._config.use_pers_bev_embed:
-            features["pers_bev"] = self._get_pers_bev(agent_input)
-
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
         ego_status_list = []
-        for i in range(2):
+        for i in range(self._config.seq_len):
             idx = -(i + 1)
-
             ego_status = torch.concatenate(
                 [
                 torch.tensor(agent_input.ego_statuses[idx].driving_command, dtype=torch.float32),
                 torch.tensor(agent_input.ego_statuses[idx].ego_velocity, dtype=torch.float32),
                 torch.tensor(agent_input.ego_statuses[idx].ego_acceleration, dtype=torch.float32)
                 ],
-            )  # [8,]
-
+            )
             ego_status_list.append(ego_status)
 
         features["status_feature"] = ego_status_list  # [seq_len, 8]
@@ -146,21 +116,28 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
 
     def _get_camera_feature(self, agent_input: AgentInput, initial_token: str, rotation_num=3) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
         """
-        Extract stitched camera from AgentInput
-        :param agent_input: input dataclass
-        :return: stitched front view image as torch tensor, List[torch.Tensor]
+        Extract teacher and student camera input from AgentInput
+        :param 
+          agent_input: input dataclass
+          initial_token: scene token, used to get the specific rotation angle of augmentation
+          rotation_num: number of rotation angle
         """
         res = dict()
+
         seq_len = self._config.seq_len
         cameras = agent_input.cameras[-seq_len:]  # List[Cameras]
         assert(len(cameras) == seq_len)
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
         
+        # Teacher input
         res['ori_teacher'] = []
+
+        # Student input
         res['ori'] = []
         res['rotated'] = [[] for _ in range(rotation_num)]
+
         for camera in cameras:
             image = camera.cam_l0.image
             if image is not None and image.size > 0 and np.any(image):
@@ -177,28 +154,23 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
                     r2 = camera.cam_r2.image[28:-28, 1100:]
                     b0_left = camera.cam_b0.image[28:-28, :1080]
                     b0_right = camera.cam_b0.image[28:-28, -1080:]
-
+                
                 if n_camera == 1:
                     ori_image = f0
-                    if self._config.lab.limited_1_camera:
-                        l0 = np.zeros_like(f0)
-                        r0 = np.zeros_like(f0)
-                        l1 = np.zeros_like(f0)
-                        r1 = np.zeros_like(f0)
                 elif n_camera == 3:
                     ori_image = np.concatenate([l0, f0, r0], axis=1)
                 elif n_camera == 5:
                     ori_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
                 else:
-                    raise NotImplementedError
-
+                    raise NotImplementedError(f"n_camera={n_camera} is not supported")
+                
                 _ori_image = cv2.resize(ori_image, (self._config.camera_width, self._config.camera_height))
                 res['ori_teacher'].append(self.teacher_ori_augmentation(_ori_image))
-                student_ori_img = self.student_ori_augmentation(_ori_image)
-                res['ori'].append(student_ori_img)
+                res['ori'].append(self.student_ori_augmentation(_ori_image))
 
                 # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
                 #     import pdb; pdb.set_trace()
+                
                 if n_camera < 5:
                     stitched_image = np.concatenate([l1, l0, f0, r0, r1], axis=1)
                 else:
@@ -222,37 +194,22 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
                 elif n_camera == 5:
                     img_w = img_3cam_w + l1_w + r1_w
                 else:
-                    raise NotImplementedError
+                    raise NotImplementedError(f"n_camera={n_camera} is not supported")
 
                 for i in range(rotation_num):
                     _ego_rotation_angle_degree = self.aug_info[initial_token][i]['rot']
                     offset_w = int(half_view_w / 180 * _ego_rotation_angle_degree)
                     
                     rotated_image = stitched_image[:, int(whole_w/2-offset_w-img_w/2):int(whole_w/2-offset_w+img_w/2)]
-
                     resized_image = cv2.resize(rotated_image, (self._config.camera_width, self._config.camera_height))
                     tensor_image = self.student_rotated_augmentation(resized_image)  # [3, h, w]
+
                     if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
                         _img = transforms.ToPILImage()(tensor_image)
                         _img.save(f'{debug_dir}/output_tensor_image_{i}.jpg')
                     res['rotated'][i].append(tensor_image)
                 
         return res
-
-    def _get_camera_feature_back(self, agent_input: AgentInput) -> torch.Tensor:
-        cameras = agent_input.cameras[-1]
-
-        # Crop to ensure 4:1 aspect ratio
-        l2 = cameras.cam_l2.image[28:-28, 416:-416]
-        b0 = cameras.cam_b0.image[28:-28]
-        r2 = cameras.cam_r2.image[28:-28, 416:-416]
-
-        # stitch l0, f0, r0 images
-        stitched_image = np.concatenate([l2, b0, r2], axis=1)
-        resized_image = cv2.resize(stitched_image, (self._config.camera_width, self._config.camera_height))
-        tensor_image = transforms.ToTensor()(resized_image)
-
-        return tensor_image
 
     def _get_lidar_feature(self, agent_input: AgentInput, initial_token: str, rotation_num=3) -> Dict[str, torch.Tensor]:
         """
@@ -397,49 +354,6 @@ class DriveSuprimTargetBuilder(AbstractTargetBuilder):
         else:
             _rotations = [0]
             _reverse_rotations = [0]
-        
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            def _visualize_trajectories(original_poses, rotated_poses, filename, traj_name):
-                import matplotlib.pyplot as plt
-                import matplotlib
-                zhfont1 = matplotlib.font_manager.FontProperties(fname="/DATA3/yaowenhao/downloads/fonts/SourceHanSansSC-Normal.otf") 
-                plt.figure(figsize=(8, 8))
-                ax = plt.gca()
-                ax.set_aspect('equal')
-                
-                # Set plot limits with some padding
-                max_x = max(abs(original_poses[:, 0].max()), abs(rotated_poses[:, 0].max()))
-                max_y = max(abs(original_poses[:, 1].max()), abs(rotated_poses[:, 1].max()))
-                margin = 3  # Add 5m margin
-                plt.xlim(-1, max_x+2)
-                plt.ylim(-max_y-margin, max_y+margin)
-                
-                # Add grid
-                plt.grid(True, linestyle='--', alpha=0.7)
-                
-                # Set ticks at reasonable intervals
-                tick_spacing = 5
-                x_ticks = np.arange(int(0), int(15)+1, tick_spacing)
-                y_ticks = np.arange(int(-5), int(5)+1, tick_spacing)
-                plt.xticks(x_ticks)
-                plt.yticks(y_ticks)
-                
-                # Plot origin point as star
-                plt.plot(0, 0, '*', color='grey', markersize=8, label='自车位置')
-                
-                # Plot trajectory points and connecting lines for both trajectories
-                for poses, color, label in [(original_poses, '#FF69B4', '原始轨迹'),  # Pink
-                                            (rotated_poses, '#4169E1', traj_name)]:    # Royal Blue
-                    x = poses[:, 0]
-                    y = poses[:, 1]
-                    plt.scatter(x, y, c=color, s=50, alpha=0.7, label=label)
-                    plt.plot(x, y, c=color, alpha=0.5)
-                    # Draw line from origin to first point with matching color
-                    plt.plot([0, x[0]], [0, y[0]], c=color, alpha=0.5)
-                
-                plt.legend(loc='upper right', prop=zhfont1)
-                plt.savefig(filename, dpi=400, bbox_inches='tight')
-                plt.close()
 
         # Original trajectory
         ori_trajectory = torch.tensor(future_traj.poses)  # [num_poses, 3]
@@ -457,11 +371,6 @@ class DriveSuprimTargetBuilder(AbstractTargetBuilder):
                     rotated_heading = (pose[2] + _reverse_rotation + np.pi) % (2*np.pi) - np.pi
                     rotated_poses.append(np.array([rotated_xy[0], rotated_xy[1], rotated_heading]))
                 rotated_poses = np.array(rotated_poses)
-
-                # Visualize both trajectories side by side
-                # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-                #     _visualize_trajectories(future_traj.poses, rotated_poses, f'trajectory_comparison_{_reverse_rotation/np.pi*180:.2f}.png', '增强后的轨迹')
-
                 rotated_trajectories.append(torch.tensor(rotated_poses))  # [num_poses, 3]
             else:
                 rotated_trajectories.append(ori_trajectory)  # Use original trajectory when no rotation

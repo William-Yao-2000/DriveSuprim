@@ -1,13 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Any, List, Tuple, Dict
+from dataclasses import dataclass
+from typing import Tuple
 
 from nuplan.common.maps.abstract_map import SemanticMapLayer
 from nuplan.common.actor_state.tracked_objects_types import TrackedObjectType
 from nuplan.planning.simulation.trajectory.trajectory_sampling import TrajectorySampling
 
 from navsim.agents.transfuser.transfuser_config import TransfuserConfig
-import os
-NAVSIM_DEVKIT_ROOT = os.environ.get("NAVSIM_DEVKIT_ROOT")
 
 
 @dataclass
@@ -41,90 +39,28 @@ class EgoPerturbConfig:
 
 
 @dataclass
-class CameraProblemConfig:
-    shutdown_enable: bool = False
-    shutdown_mode: int = 1
-    shutdown_probability: float = 0
-    
-    noise_enable: bool = False  # randomly set the pixel value
-    noise_percentage: float = 0
-
-    gaussian_enable: bool = False
-    gaussian_mode: str = 'random'  # random or load_from_offline
-    gaussian_probability: float = 0.0  # probability of applying gaussian noise to an image
-    gaussian_mean: float = 0.0  # mean of gaussian noise
-    gaussian_min_std: float = 0.05  # minimum std when using random std
-    gaussian_max_std: float = 0.25  # maximum std when using random std
-    gaussian_offline_file: str = ''  # file path for offline gaussian noise parameters
-
-    # Weather augmentation settings
-    weather_enable: bool = False
-    weather_aug_mode: str = 'random'  # random or load_from_offline
-    fog_prob: float = 0.2  # probability of applying fog effect
-    rain_prob: float = 0.2  # probability of applying rain effect
-    snow_prob: float = 0.2  # probability of applying snow effect
-
-
-@dataclass
-class DinoConfig:
-    loss_weight: float = 1.0
-    head_n_prototypes: int = 65536
-    head_bottleneck_dim: int = 256
-    head_nlayers: int = 3
-    head_hidden_dim: int = 2048
-    koleo_loss_weight: float = 0.1
-
-
-@dataclass
-class IbotConfig:
-    loss_weight: float = 1.0
-    mask_sample_probability: float = 0.5
-    mask_ratio_min_max: Tuple[float, float] = (0.1, 0.5)
-    separate_head: bool = True
-    head_n_prototypes: int = 65536
-    head_bottleneck_dim: int = 256
-    head_nlayers: int = 3
-    head_hidden_dim: int = 2048
-
-
-@dataclass
 class RefinementConfig:
     use_multi_stage: bool = False
-    refinement_approach: str = "offset_decoder"
+    refinement_approach: str = "transformer_decoder"
     num_refinement_stage: int = 1  # 2
     stage_layers: str = "3"  # "3+3"
     topks: str = "256"  # "256+64"
 
     use_mid_output: bool = True
-    use_offset_refinement: bool = True  # abandoned
-    use_offset_refinement_v2: bool = False
     use_separate_stage_heads: bool = True
 
-    traj_expansion_in_infer: bool = False
     n_total_traj: int = 1024
 
 
 @dataclass
 class LabConfig:
-    check_top_k_traj: bool = False
     num_top_k: int = 64
     test_full_vocab_pdm_score_path: str = "???"
     use_first_stage_traj_in_infer: bool = False
 
     change_loss_weight: bool = False
     use_imi_learning_in_refinement: bool = True
-    adjust_refinement_loss_weight: bool = False  # change refinement loss weight: 256 / 8192.0
-    adjust_refinement_score_weight: bool = False  # change dac, ep, lk score weight to 2 times
     ban_soft_label_loss: bool = False
-    optimize_prev_frame_traj_for_ec: bool = False
-    refinement_metrics: str = "all"  # 'all' or 'dac_ep_lk' or 'dac_ep_lk_pdms'
-    use_higher_res_feat_in_refinement: bool = False
-    limited_1_camera: bool = False
-
-    use_temperature_bce: bool = False
-    bce_temperature: float = 3.0
-    use_label_smoothing: bool = False
-    label_smoothing_value: float = 0.1
 
     use_cosine_ema_scheduler: bool = False
     ema_momentum_start: float = 0.99
@@ -149,8 +85,6 @@ class DriveSuprimConfig(TransfuserConfig):
     progress_weight: float = 2.0
     ttc_weight: float = 2.0
 
-    inference_imi_weight: float = 0.1
-    inference_da_weight: float = 1.0
     decouple: bool = False
     vocab_size: int = 4096
     vocab_path: str = None
@@ -164,8 +98,6 @@ class DriveSuprimConfig(TransfuserConfig):
     rel: bool = False
     use_nerf: bool = False
     extra_traj_layer: bool = False
-
-    use_back_view: bool = False
 
     extra_tr: bool = False
     vadv2_head_nhead: int = 8
@@ -291,7 +223,6 @@ class DriveSuprimConfig(TransfuserConfig):
     # robust setting
     training: bool = True
     ego_perturb: EgoPerturbConfig = EgoPerturbConfig()
-    camera_problem: CameraProblemConfig = CameraProblemConfig()
     only_ori_input: bool = False  # 如果是 True，说明是原来的训练设置
     student_rotation_ensemble: int = 3
     ori_vocab_pdm_score_full_path: str = "???"
@@ -309,8 +240,6 @@ class DriveSuprimConfig(TransfuserConfig):
 
     use_rotation_loss: bool = False
     use_mask_loss: bool = False
-    dino: DinoConfig = DinoConfig()
-    ibot: IbotConfig = IbotConfig()
     refinement: RefinementConfig = RefinementConfig()
     
     inference: InferConfig = InferConfig()

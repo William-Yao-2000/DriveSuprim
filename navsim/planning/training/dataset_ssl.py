@@ -1,18 +1,17 @@
 import gzip
 import logging
 import os
-import pickle
 from pathlib import Path
+import pickle
+from tqdm import tqdm
 from typing import Dict, List, Optional, Tuple
-import random, time
 
 import torch
-from tqdm import tqdm
 
 from navsim.common.dataclasses import AgentInput
 from navsim.common.dataloader import SceneLoader
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
-from navsim.agents.hydra_ssl_v1.hydra_config_ssl import HydraConfigSSL
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +140,7 @@ class DatasetSSL(torch.utils.data.Dataset):
         scene_loader: SceneLoader,
         feature_builders: List[AbstractFeatureBuilder],
         target_builders: List[AbstractTargetBuilder],
-        cfg: HydraConfigSSL,
+        cfg: DriveSuprimConfig,
         cache_path: Optional[str] = None,
         force_cache_computation: bool = False,
         append_token_to_batch: bool = False,
@@ -302,7 +301,7 @@ class DatasetSSL(torch.utils.data.Dataset):
             scene = self._scene_loader.get_scene_from_token(self._scene_loader.tokens[idx])
             agent_input = scene.get_agent_input()
             for builder in self._feature_builders:
-                if 'plantf' in builder.get_unique_name() or builder.get_unique_name() == 'hydra_feature_ssl':
+                if 'plantf' in builder.get_unique_name() or builder.get_unique_name() == 'drivesuprim_feature':
                     features.update(builder.compute_features(agent_input, scene))
                 else:
                     features.update(builder.compute_features(agent_input))

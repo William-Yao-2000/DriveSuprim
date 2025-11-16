@@ -4,7 +4,6 @@ Implements the TransFuser vision backbone.
 import os
 import timm
 
-import torch
 from torch import nn
 
 from navsim.agents.backbones.eva import EVAViT
@@ -128,36 +127,13 @@ class DriveSuprimBackbonePE(nn.Module):
         )
         self.img_feat_c = vit_channels
 
-    def forward(self, image):
-        B, C, H, W = image.shape
-        if self.backbone_type == 'vov' or self.backbone_type == 'vit':
-            image_features = self.image_encoder(image)[-1]
-        elif self.backbone_type == 'sptr':
-            # split img into two patches
-            half_w = W // 2
-            image_left = image[..., :half_w]
-            image_right = image[..., half_w:]
-            image_features_left = self.image_encoder(image_left)[-1]
-            image_features_right = self.image_encoder(image_right)[-1]
-            image_features = torch.cat([
-                image_features_left, image_features_right
-            ], -1)
-        else:
-            raise ValueError('Forward wrong backbone')
-        return self.avgpool_img(image_features)
-
-    def forward_tup(self, image, **kwargs):
+    def forward(self, image, **kwargs):
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
         if isinstance(self.image_encoder, DAViT):
-            image_feat_tup = self.image_encoder(image, **kwargs)[-1]
+            image_feat = self.image_encoder(image, **kwargs)[-1]
         else:
             image_feat = self.image_encoder(image)[-1]
-            class_feat = image_feat.mean(dim=(-1, -2))
-            image_feat_tup = (image_feat, class_feat)
         
-        if self.config.lab.use_higher_res_feat_in_refinement:
-            return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1], image_feat_tup[0])
-        else:
-            return (self.avgpool_img(image_feat_tup[0]), image_feat_tup[1])
+        return self.avgpool_img(image_feat)

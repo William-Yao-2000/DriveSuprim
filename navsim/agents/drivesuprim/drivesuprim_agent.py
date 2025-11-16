@@ -14,7 +14,7 @@ from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
 from navsim.agents.drivesuprim.drivesuprim_features import DriveSuprimFeatureBuilder, DriveSuprimTargetBuilder
 from navsim.agents.drivesuprim.ssl_meta_arch import SSLMetaArch
-from navsim.agents.drivesuprim.drivesuprim_loss_fn import hydra_kd_imi_agent_loss_robust, hydra_kd_imi_agent_loss_single_stage
+from navsim.agents.drivesuprim.drivesuprim_loss_fn import drivesuprim_agent_loss_first_stage, drivesuprim_agent_loss_single_refine_stage
 from navsim.agents.drivesuprim.drivesuprim_model import DriveSuprimModel
 from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import (
@@ -116,7 +116,6 @@ class DriveSuprimAgent(AbstractAgent):
         teacher_ori_features['status_feature'] = features['status_feature']
 
         student_feat_dict_lst = []
-        
         student_ori_features['camera_feature'] = features['ori']
         student_ori_features['status_feature'] = features['status_feature']
         student_feat_dict_lst.append(student_ori_features)
@@ -130,8 +129,9 @@ class DriveSuprimAgent(AbstractAgent):
                     }
                 )
 
-        teacher_pred, student_preds, loss_dict = self.model(teacher_ori_features, student_feat_dict_lst, **kwargs)
-        return teacher_pred, student_preds, loss_dict
+        teacher_pred, student_preds = self.model(teacher_ori_features, student_feat_dict_lst, **kwargs)
+        
+        return teacher_pred, student_preds
 
     def compute_loss(
             self,
@@ -140,8 +140,11 @@ class DriveSuprimAgent(AbstractAgent):
             predictions: List[Dict[str, torch.Tensor]],
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        """
+        Compute the student loss using ground truth.
+        """
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         # ori data
         ori_targets = { 'trajectory': targets['ori_trajectory'] }
@@ -151,7 +154,7 @@ class DriveSuprimAgent(AbstractAgent):
             tmp = [self.ori_vocab_pdm_score_full[token][k][None] for token in tokens]
             scores[k] = (torch.from_numpy(np.concatenate(tmp, axis=0))
                         .to(ori_predictions['trajectory'].device))
-        ori_loss = hydra_kd_imi_agent_loss_robust(ori_targets, ori_predictions, self._config, scores)
+        ori_loss = drivesuprim_agent_loss_first_stage(ori_targets, ori_predictions, self._config, scores)
         if self._config.only_ori_input:
             return { "ori": ori_loss }
 
@@ -168,7 +171,7 @@ class DriveSuprimAgent(AbstractAgent):
                 tmp = [_aug_vocab_pdm_score[token][idx][k][None] for token in tokens]
                 scores[k] = (torch.from_numpy(np.concatenate(tmp, axis=0))
                             .to(predictions[idx+1]['trajectory'].device))
-            aug_loss.append(hydra_kd_imi_agent_loss_robust(aug_targets, predictions[idx+1], self._config, scores))
+            aug_loss.append(drivesuprim_agent_loss_first_stage(aug_targets, predictions[idx+1], self._config, scores))
         
         # Calculate average loss and loss dict
         avg_aug_loss = torch.mean(torch.stack([loss[0] for loss in aug_loss]))
@@ -187,6 +190,10 @@ class DriveSuprimAgent(AbstractAgent):
             targets,
             tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
+        """
+        Compute the student loss using teacher soft label.
+        """
+
         # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
         #     import pdb; pdb.set_trace()
 
@@ -212,7 +219,7 @@ class DriveSuprimAgent(AbstractAgent):
             # Apply clamped adjustment to original scores
             revised_scores[k] = scores[k] + clamped_diff
         
-        soft_loss = hydra_kd_imi_agent_loss_robust(revised_targets, student_pred, self._config, revised_scores)
+        soft_loss = drivesuprim_agent_loss_first_stage(revised_targets, student_pred, self._config, revised_scores)
         return soft_loss
     
     
@@ -224,21 +231,18 @@ class DriveSuprimAgent(AbstractAgent):
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         _refinement_metrics = self.metrics
-        if self._config.lab.refinement_metrics == 'dac_ep_lk_pdms':
-            _refinement_metrics = _refinement_metrics + ['pdm_score']
-
         trajectory_vocab = predictions[0]['trajectory_vocab']
-
         result_dict = dict()
-        # ori
+
+        # ori data
         ori_loss_lst = []
         ori_predictions = predictions[0]['refinement']
-        num_stage = len(ori_predictions)
-        for i in range(num_stage):
+        num_refinement_stage = len(ori_predictions)
+        for i in range(num_refinement_stage):
             pred_i = ori_predictions[i]
             selected_indices_i = pred_i['indices_absolute']
             scores = {}
@@ -253,9 +257,9 @@ class DriveSuprimAgent(AbstractAgent):
             if self._config.lab.use_imi_learning_in_refinement:
                 _kwargs['targets'] = { 'trajectory': targets['ori_trajectory'] }
                 pred_i['trajectory_vocab'] = trajectory_vocab
-            ori_loss_i = hydra_kd_imi_agent_loss_single_stage(pred_i, self._config, scores, **_kwargs)
+            ori_loss_i = drivesuprim_agent_loss_single_refine_stage(pred_i, self._config, scores, **_kwargs)
             ori_loss_lst.append(ori_loss_i)
-        total_ori_loss = sum([loss_tup[0] for loss_tup in ori_loss_lst])
+        total_ori_loss = sum([loss_tup[0] for loss_tup in ori_loss_lst])  # sum over all refinement stages (we only use 1 refinement stage)
         total_ori_loss_dict = {}
         for i, loss_tup in enumerate(ori_loss_lst):
             loss_dict = loss_tup[1]
@@ -265,16 +269,16 @@ class DriveSuprimAgent(AbstractAgent):
         if self._config.only_ori_input:
             return result_dict
 
-        # aug
+        # aug data
         _aug_vocab_pdm_score = {}
         for token in tokens:
             with open(os.path.join(self.aug_vocab_pdm_score_dir, f'{token}.pkl'), 'rb') as f:
                 _aug_vocab_pdm_score[token] = pickle.load(f)
-        aug_loss_all_mode_lst = []
+        aug_loss_all_mode_lst = []  # a mode means a specific rotation angle
         for idx in range(self._config.student_rotation_ensemble):
             aug_loss_lst = []
             aug_idx_predictions = predictions[idx+1]['refinement']
-            for i in range(num_stage):
+            for i in range(num_refinement_stage):
                 aug_idx_pred_i = aug_idx_predictions[i]
                 aug_idx_selected_indices_i = aug_idx_pred_i['indices_absolute']
                 scores = {}
@@ -288,7 +292,7 @@ class DriveSuprimAgent(AbstractAgent):
                 if self._config.lab.use_imi_learning_in_refinement:
                     _kwargs_idx['targets'] = { 'trajectory': targets['rotated_trajectories'][idx] }
                     aug_idx_pred_i['trajectory_vocab'] = trajectory_vocab
-                aug_loss_lst.append(hydra_kd_imi_agent_loss_single_stage(aug_idx_pred_i, self._config, scores, **_kwargs_idx))
+                aug_loss_lst.append(drivesuprim_agent_loss_single_refine_stage(aug_idx_pred_i, self._config, scores, **_kwargs_idx))
             aug_loss_single_mode = sum([loss_tup[0] for loss_tup in aug_loss_lst])
             aug_loss_single_mode_dict = {}
             for i, loss_tup in enumerate(aug_loss_lst):
@@ -297,7 +301,7 @@ class DriveSuprimAgent(AbstractAgent):
                     aug_loss_single_mode_dict[f"stage_{i+2}_{_key}"] = _value
             aug_loss_all_mode_lst.append((aug_loss_single_mode, aug_loss_single_mode_dict))
         
-        # Calculate average loss and loss dict
+        # Calculate average loss and loss dict across all (3) rotation angles
         avg_aug_loss = torch.mean(torch.stack([loss[0] for loss in aug_loss_all_mode_lst]))
         avg_aug_loss_dict = {}
         for key in aug_loss_all_mode_lst[0][1].keys():

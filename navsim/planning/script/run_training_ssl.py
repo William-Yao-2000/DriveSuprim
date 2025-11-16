@@ -14,9 +14,9 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
-from navsim.agents.hydra_ssl.data.collate import collate_data_and_cast
-from navsim.agents.hydra_ssl.data.masking import MaskingGenerator
-from navsim.agents.hydra_ssl.hydra_config_ssl import HydraConfigSSL
+from navsim.agents.drivesuprim.data.collate import collate_data_and_cast
+from navsim.agents.drivesuprim.data.masking import MaskingGenerator
+from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
 from navsim.common.dataclasses import SceneFilter
 from navsim.common.dataloader import SceneLoader
 from navsim.planning.training.dataset_ssl import CacheOnlyDataset, DatasetSSL
@@ -94,7 +94,7 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[DatasetSSL, D
 
 
 def build_dataloaders(train_data, val_data, cfg):
-    agent_cfg: HydraConfigSSL = cfg.agent.config
+    agent_cfg: DriveSuprimConfig = cfg.agent.config
     
     if not agent_cfg.use_mask_loss:
         logger.info("Building Datasets")
