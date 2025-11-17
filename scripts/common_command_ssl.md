@@ -392,11 +392,9 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     dataloader.params.num_workers=0 \
     dataloader.params.pin_memory=false \
     dataloader.params.prefetch_factor=null \
-    agent.config.ego_perturb.mode=load_from_offline \
-    agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-trans_0-va_0-p_0.5-ensemble.json \
-    agent.config.ego_perturb.rotation.enable=true \
-    agent.config.ego_perturb.rotation.offline_aug_angle_boundary=30 \
-    agent.config.student_rotation_ensemble=3 \
+    agent.config.ego_perturb.n_student_rotation_ensemble=3 \
+    agent.config.ego_perturb.offline_aug_angle_boundary=30 \
+    agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-p_0.5-ensemble.json \
     agent.config.refinement.use_multi_stage=true \
     agent.config.refinement.num_refinement_stage=1 \
     agent.config.refinement.stage_layers=3 \

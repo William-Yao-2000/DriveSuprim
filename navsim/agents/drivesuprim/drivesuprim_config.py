@@ -11,31 +11,15 @@ from navsim.agents.transfuser.transfuser_config import TransfuserConfig
 @dataclass
 class InferConfig:
     model: str = "teacher"  # teacher or student
-    use_aug: bool = True  # whether using teacher augmentation
+    use_first_stage_traj_in_infer: bool = False
+    save_pickle: bool = False
 
-
-@dataclass
-class RotationConfig:
-    enable: bool = False
-    fixed_angle: float = 0  # degree, positive: turn left
-    offline_aug_angle_boundary: float = 0
-    change_camera: bool = False
-    crop_from_panoramic: bool = False
-
-
-@dataclass
-class VAConfig:
-    # vel and acc perturb
-    enable: bool = False
-    offline_aug_boundary: float = 0
 
 @dataclass
 class EgoPerturbConfig:
-    mode: str = 'fixed'  # 'fixed' or 'load_from_offline'
-    ensemble_aug: bool = False
+    n_student_rotation_ensemble: int = 3
+    offline_aug_angle_boundary: float = 0
     offline_aug_file: str = '???'
-    rotation: RotationConfig = RotationConfig()
-    va: VAConfig = VAConfig()
 
 
 @dataclass
@@ -43,33 +27,17 @@ class RefinementConfig:
     use_multi_stage: bool = False
     refinement_approach: str = "transformer_decoder"
     num_refinement_stage: int = 1  # 2
-    stage_layers: str = "3"  # "3+3"
-    topks: str = "256"  # "256+64"
-
+    stage_layers: str = "3"  # "3" or "3+3" ...
+    topks: str = "256"  # "256" or "256+64" ...
     use_mid_output: bool = True
     use_separate_stage_heads: bool = True
-
-    n_total_traj: int = 1024
-
-
-@dataclass
-class LabConfig:
-    num_top_k: int = 64
-    test_full_vocab_pdm_score_path: str = "???"
-    use_first_stage_traj_in_infer: bool = False
-
-    change_loss_weight: bool = False
     use_imi_learning_in_refinement: bool = True
-    ban_soft_label_loss: bool = False
-
-    use_cosine_ema_scheduler: bool = False
-    ema_momentum_start: float = 0.99
-    update_buffer_in_ema: bool = False
-    save_pickle: bool = False
 
 
 @dataclass
 class DriveSuprimConfig(TransfuserConfig):
+    ckpt_path: str = None
+
     seq_len: int = 2
     trajectory_imi_weight: float = 1.0
     trajectory_pdm_weight = {
@@ -82,24 +50,13 @@ class DriveSuprimConfig(TransfuserConfig):
         'traffic_light_compliance': 3.0,
         'history_comfort': 1.0,
     }
-    progress_weight: float = 2.0
-    ttc_weight: float = 2.0
 
-    decouple: bool = False
-    vocab_size: int = 4096
+    vocab_size: int = 8192
     vocab_path: str = None
     normalize_vocab_pos: bool = False
-    num_ego_status: int = 1
     
-    ckpt_path: str = None
+    num_ego_status: int = 1
     sigma: float = 0.5
-    use_pers_bev_embed: bool = False
-    type: str = 'center'
-    rel: bool = False
-    use_nerf: bool = False
-    extra_traj_layer: bool = False
-
-    extra_tr: bool = False
     vadv2_head_nhead: int = 8
     vadv2_head_nlayers: int = 3
 
@@ -108,75 +65,22 @@ class DriveSuprimConfig(TransfuserConfig):
     )
 
     # img backbone
-    use_final_fpn: bool = False
-    use_img_pretrained: bool = False
-    # image_architecture: str = "vit_large_patch14_dinov2.lvd142m"
-    image_architecture: str = "resnet34"
-    backbone_type: str = 'resnet'
+    backbone_type: str = 'resnet34'
     vit_ckpt: str = ''
     intern_ckpt: str = ''
     vov_ckpt: str = ''
-    eva_ckpt: str = ''
     swin_ckpt: str = ''
-    
     sptr_ckpt: str = ''
-    map_ckpt: str = ''
-
-
+    
     lr_mult_backbone: float = 1.0
     backbone_wd: float = 0.0
-
-    # lidar backbone
-    lidar_architecture: str = "resnet34"
-
-    max_height_lidar: float = 100.0
-    pixels_per_meter: float = 4.0
-    hist_max_per_pixel: int = 5
-
-    lidar_min_x: float = -32
-    lidar_max_x: float = 32
-    lidar_min_y: float = -32
-    lidar_max_y: float = 32
-
-    lidar_split_height: float = 0.2
-    use_ground_plane: bool = False
-
-    # new
-    lidar_seq_len: int = 1
 
     n_camera: int = 3  # 1 or 3 or 5
 
     camera_width: int = 2048
     camera_height: int = 512
-    lidar_resolution_width: int = 256
-    lidar_resolution_height: int = 256
-
     img_vert_anchors: int = camera_height // 32
     img_horz_anchors: int = camera_width // 32
-    lidar_vert_anchors: int = lidar_resolution_height // 32
-    lidar_horz_anchors: int = lidar_resolution_width // 32
-
-    block_exp = 4
-    n_layer = 2  # Number of transformer layers used in the vision backbone
-    n_head = 4
-    n_scale = 4
-    embd_pdrop = 0.1
-    resid_pdrop = 0.1
-    attn_pdrop = 0.1
-    # Mean of the normal distribution initialization for linear layers in the GPT
-    gpt_linear_layer_init_mean = 0.0
-    # Std of the normal distribution initialization for linear layers in the GPT
-    gpt_linear_layer_init_std = 0.02
-    # Initial weight of the layer norms in the gpt.
-    gpt_layer_norm_init_weight = 1.0
-
-    perspective_downsample_factor = 1
-    transformer_decoder_join = True
-    detect_boxes = True
-    use_bev_semantic = True
-    use_semantic = False
-    use_depth = False
-    add_features = True
 
     # Transformer
     tf_d_model: int = 256
@@ -185,72 +89,19 @@ class DriveSuprimConfig(TransfuserConfig):
     tf_num_head: int = 8
     tf_dropout: float = 0.0
 
-    # detection
-    num_bounding_boxes: int = 30
-
-    # loss weights
-    agent_class_weight: float = 10.0
-    agent_box_weight: float = 1.0
-    bev_semantic_weight: float = 10.0
-
-    # BEV mapping
-    bev_semantic_classes = {
-        1: ("polygon", [SemanticMapLayer.LANE, SemanticMapLayer.INTERSECTION]),  # road
-        2: ("polygon", [SemanticMapLayer.WALKWAYS]),  # walkways
-        3: ("linestring", [SemanticMapLayer.LANE, SemanticMapLayer.LANE_CONNECTOR]),  # centerline
-        4: (
-            "box",
-            [
-                TrackedObjectType.CZONE_SIGN,
-                TrackedObjectType.BARRIER,
-                TrackedObjectType.TRAFFIC_CONE,
-                TrackedObjectType.GENERIC_OBJECT,
-            ],
-        ),  # static_objects
-        5: ("box", [TrackedObjectType.VEHICLE]),  # vehicles
-        6: ("box", [TrackedObjectType.PEDESTRIAN]),  # pedestrians
-    }
-
-    bev_pixel_width: int = lidar_resolution_width
-    bev_pixel_height: int = lidar_resolution_height // 2
-    bev_pixel_size: float = 1 / pixels_per_meter
-
-    num_bev_classes = 7
-    bev_features_channels: int = 64
-    bev_down_sample_factor: int = 4
-    bev_upsample_factor: int = 2
-
-    # robust setting
     training: bool = True
-    ego_perturb: EgoPerturbConfig = EgoPerturbConfig()
+
+    # Augmentation setting
     only_ori_input: bool = False  # 如果是 True，说明是原来的训练设置
-    student_rotation_ensemble: int = 3
+    ego_perturb: EgoPerturbConfig = EgoPerturbConfig()
     ori_vocab_pdm_score_full_path: str = "???"
     aug_vocab_pdm_score_dir: str = "???"
-    pdm_closed_traj_path: str = "???"
-    weakly_supervised_imi_learning: bool = False  # 直接不学 augmented 之后的 traj
-    pdm_close_traj_for_augmented_gt: bool = False
-    traj_smoothing: bool = False  # pdm_close_traj_for_augmented_gt 为 false 时，本来应该直接对原来的 traj 做旋转变换，但是 smoothing 可以将轨迹跟车的运动速度更加贴合
 
-    only_imi_learning: bool = False
-
+    # Self-distillation
     soft_label_traj: str = 'first'  # first or final
     soft_label_imi_diff_thresh: float = 1.0
     soft_label_score_diff_thresh: float = 0.15
+    update_buffer_in_ema: bool = False
 
-    use_rotation_loss: bool = False
-    use_mask_loss: bool = False
     refinement: RefinementConfig = RefinementConfig()
-    
     inference: InferConfig = InferConfig()
-
-    lab: LabConfig = LabConfig()
-
-    @property
-    def bev_semantic_frame(self) -> Tuple[int, int]:
-        return (self.bev_pixel_height, self.bev_pixel_width)
-
-    @property
-    def bev_radius(self) -> float:
-        values = [self.lidar_min_x, self.lidar_max_x, self.lidar_min_y, self.lidar_max_y]
-        return max([abs(value) for value in values])

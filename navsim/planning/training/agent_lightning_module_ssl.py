@@ -35,7 +35,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
         self.v_params = get_pacifica_parameters()
 
         self.only_ori_input = cfg.only_ori_input
-        self.n_rotation_crop = cfg.student_rotation_ensemble
 
 
     def _step(self, batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]], logging_prefix: str) -> Tensor:
@@ -68,12 +67,11 @@ class AgentLightningModuleSSL(pl.LightningModule):
             loss = loss + aug_loss[0]
 
         # compute loss for student (using teacher soft label)
-        if not self._cfg.lab.ban_soft_label_loss:
-            loss_soft_teacher = self.agent.compute_loss_soft_teacher(teacher_pred, student_preds[0], targets, tokens)
-            for k, v in loss_soft_teacher[1].items():
-                self.log(f"{logging_prefix}/{k}-soft", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log(f"{logging_prefix}/loss-soft", loss_soft_teacher[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-            loss = loss + loss_soft_teacher[0]
+        loss_soft_teacher = self.agent.compute_loss_soft_teacher(teacher_pred, student_preds[0], targets, tokens)
+        for k, v in loss_soft_teacher[1].items():
+            self.log(f"{logging_prefix}/{k}-soft", v, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log(f"{logging_prefix}/loss-soft", loss_soft_teacher[0], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        loss = loss + loss_soft_teacher[0]
 
         if self._cfg.refinement.use_multi_stage:
             loss_refinement = self.agent.compute_loss_multi_stage(features, targets, student_preds, tokens)
@@ -114,11 +112,10 @@ class AgentLightningModuleSSL(pl.LightningModule):
         optimizer,
         optimizer_closure = None,
     ) -> None:
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
+
         optimizer.step(closure=optimizer_closure)
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
-        # if self._cfg.lab.use_cosine_ema_scheduler:
-        #     m = self.momentum_schedule[epoch]
 
         if self._cfg.backbone_type in ('resnet34', 'resnet50'):
             if epoch < 3:
@@ -153,10 +150,10 @@ class AgentLightningModuleSSL(pl.LightningModule):
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
     ):
-        return self.predict_step_hydra(batch, batch_idx)
+        return self.predict_step_drivesuprim(batch, batch_idx)
     
 
-    def predict_step_hydra(
+    def predict_step_drivesuprim(
             self,
             batch: Tuple[Dict[str, Tensor], Dict[str, Tensor]],
             batch_idx: int
@@ -165,7 +162,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
         self.agent.eval()
         with torch.no_grad():
             predictions, _, _ = self.agent.forward(batch)
-            if self._cfg.refinement.use_multi_stage and not self._cfg.lab.use_first_stage_traj_in_infer:
+            if self._cfg.refinement.use_multi_stage and not self._cfg.inference.use_first_stage_traj_in_infer:
                 poses = predictions['final_traj'].cpu().numpy()
             else:
                 poses = predictions["trajectory"].cpu().numpy()
@@ -189,9 +186,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
         if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
             import pdb; pdb.set_trace()
 
-        # filtered_trajs = predictions['refinement'][0]['trajs']
-        # filtered_indices = predictions['refinement'][0]['indices_absolute']
-        # filtered_scores = predictions['filtered_final_scores']
 
         result = {}
         for (pose,
@@ -203,9 +197,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
              driving_direction_compliance,
              lane_keeping,
              traffic_light_compliance,
-            #  filtered_traj,
-            #  filtered_index,
-            #  filtered_score,
              token) in \
                 zip(poses,
                     imis,
@@ -216,9 +207,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
                     driving_direction_compliance_all,
                     lane_keeping_all,
                     traffic_light_compliance_all,
-                    # filtered_trajs,
-                    # filtered_indices,
-                    # filtered_scores,
                     tokens):
             result[token] = {
                 'trajectory': Trajectory(pose, TrajectorySampling(time_horizon=4, interval_length=interval_length)),
@@ -230,8 +218,5 @@ class AgentLightningModuleSSL(pl.LightningModule):
                 'driving_direction_compliance': driving_direction_compliance,
                 'lane_keeping': lane_keeping,
                 'traffic_light_compliance': traffic_light_compliance,
-                # 'filtered_traj': filtered_traj,
-                # 'filtered_index': filtered_index,
-                # 'filtered_score': filtered_score,
             }
         return result

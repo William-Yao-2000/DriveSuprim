@@ -11,9 +11,6 @@ import torch
 from torch import nn
 
 from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
-from navsim.agents.drivesuprim.loss import DINOLoss, iBOTPatchLoss, KoLeoLoss
-from navsim.agents.drivesuprim.layers import DINOHead
-from navsim.agents.drivesuprim.utils.fsdp import get_fsdp_modules
 
 
 logger = logging.getLogger("dinov2")
@@ -58,8 +55,8 @@ class SSLMetaArch(nn.Module):
             loss.backward()
 
     def forward(self, teacher_ori_features, student_feat_dict_lst, **kwargs):
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         # teacher output
         @torch.no_grad()
@@ -79,8 +76,8 @@ class SSLMetaArch(nn.Module):
         if not self.cfg.training:
             return teacher_pred, []
         
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         student_preds = self.student.model.forward_features_list(student_feat_dict_lst)
 
@@ -93,7 +90,7 @@ class SSLMetaArch(nn.Module):
             for k in self.student.keys():
                 for stu_params, tea_params in zip(self.student[k].parameters(), self.teacher[k].parameters()):
                     tea_params.data.mul_(m).add_(stu_params.data, alpha=1 - m)
-                if self.cfg.backbone_type in ('resnet34', 'resnet50') or self.cfg.lab.update_buffer_in_ema:
+                if self.cfg.backbone_type in ('resnet34', 'resnet50') or self.cfg.update_buffer_in_ema:
                     # update buffers (e.g., running_mean/var in BatchNorm)
                     for stu_buf, tea_buf in zip(self.student[k].buffers(), self.teacher[k].buffers()):
                         tea_buf.data.copy_(stu_buf.data)

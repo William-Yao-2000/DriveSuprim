@@ -14,8 +14,6 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from navsim.agents.abstract_agent import AbstractAgent
 from navsim.agents.transfuser.transfuser_agent import TransfuserAgent
-from navsim.agents.drivesuprim.data.collate import collate_data_and_cast
-from navsim.agents.drivesuprim.data.masking import MaskingGenerator
 from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
 from navsim.common.dataclasses import SceneFilter
 from navsim.common.dataloader import SceneLoader
@@ -93,35 +91,13 @@ def build_datasets(cfg: DictConfig, agent: AbstractAgent) -> Tuple[DatasetSSL, D
     return train_data, val_data
 
 
-def build_dataloaders(train_data, val_data, cfg):
-    agent_cfg: DriveSuprimConfig = cfg.agent.config
-    
-    if not agent_cfg.use_mask_loss:
-        logger.info("Building Datasets")
-        train_dataloader = DataLoader(train_data, **cfg.dataloader.params, shuffle=True)
-        logger.info("Num training samples: %d", len(train_data))
-        val_dataloader = DataLoader(val_data, **cfg.dataloader.params, shuffle=False)
-        logger.info("Num validation samples: %d", len(val_data))
-        return train_dataloader, val_dataloader
-    else:
-        mask_generator = MaskingGenerator(
-            input_size=(agent_cfg.img_vert_anchors, agent_cfg.img_horz_anchors),
-            max_num_patches=0.5 * agent_cfg.img_vert_anchors * agent_cfg.img_horz_anchors,
-        )
-        collate_fn = partial(
-            collate_data_and_cast,
-            mask_ratio_tuple=agent_cfg.ibot.mask_ratio_min_max,
-            mask_probability=agent_cfg.ibot.mask_sample_probability,
-            n_tokens=agent_cfg.img_vert_anchors * agent_cfg.img_horz_anchors,
-            mask_generator=mask_generator,
-            dtype=torch.float,
-        )
-        logger.info("Building Datasets")
-        train_dataloader = DataLoader(train_data, **cfg.dataloader.params, shuffle=True, collate_fn=collate_fn)
-        logger.info("Num training samples: %d", len(train_data))
-        val_dataloader = DataLoader(val_data, **cfg.dataloader.params, shuffle=False, collate_fn=collate_fn)
-        logger.info("Num validation samples: %d", len(val_data))
-        return train_dataloader, val_dataloader
+def build_dataloaders(train_data, val_data, cfg):    
+    logger.info("Building Datasets")
+    train_dataloader = DataLoader(train_data, **cfg.dataloader.params, shuffle=True)
+    logger.info("Num training samples: %d", len(train_data))
+    val_dataloader = DataLoader(val_data, **cfg.dataloader.params, shuffle=False)
+    logger.info("Num validation samples: %d", len(val_data))
+    return train_dataloader, val_dataloader
 
 
 def build_model(config, only_teacher=False):

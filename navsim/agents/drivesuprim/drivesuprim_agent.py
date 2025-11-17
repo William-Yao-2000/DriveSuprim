@@ -58,7 +58,6 @@ class DriveSuprimAgent(AbstractAgent):
         self.model = SSLMetaArch(config, teacher_model, student_model)
         self.vocab_size = config.vocab_size
         self.backbone_wd = config.backbone_wd
-        self.ensemble_aug = config.ego_perturb.ensemble_aug
         self.training = config.training
 
         if self.training:
@@ -67,11 +66,11 @@ class DriveSuprimAgent(AbstractAgent):
             
             with open(config.ego_perturb.offline_aug_file, 'r') as f:
                 aug_data = json.load(f)
-            assert aug_data['param']['rot'] == config.ego_perturb.rotation.offline_aug_angle_boundary
+            assert aug_data['param']['rot'] == config.ego_perturb.offline_aug_angle_boundary
             self.aug_info = aug_data['tokens']
         
         self.only_ori_input = config.only_ori_input
-        self.n_rotation_crop = config.student_rotation_ensemble
+        self.n_rotation_angle = config.ego_perturb.n_student_rotation_ensemble
 
     def name(self) -> str:
         """Inherited, see superclass."""
@@ -103,8 +102,8 @@ class DriveSuprimAgent(AbstractAgent):
         return [DriveSuprimFeatureBuilder(config=self._config)]
 
     def forward(self, batch) -> Dict[str, torch.Tensor]:
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         features, targets, tokens = batch
         kwargs = {'tokens': tokens}
@@ -121,7 +120,7 @@ class DriveSuprimAgent(AbstractAgent):
         student_feat_dict_lst.append(student_ori_features)
         
         if not self.only_ori_input and self._config.training:
-            for i in range(self.n_rotation_crop):
+            for i in range(self.n_rotation_angle):
                 student_feat_dict_lst.append(
                     {
                         'camera_feature': features['rotated'][i],
@@ -164,7 +163,7 @@ class DriveSuprimAgent(AbstractAgent):
             with open(os.path.join(self.aug_vocab_pdm_score_dir, f'{token}.pkl'), 'rb') as f:
                 _aug_vocab_pdm_score[token] = pickle.load(f)
         aug_loss = []
-        for idx in range(self._config.student_rotation_ensemble):
+        for idx in range(self._config.ego_perturb.n_student_rotation_ensemble):
             aug_targets = { 'trajectory': targets['rotated_trajectories'][idx] }
             scores = {}
             for k in self.metrics:
@@ -194,8 +193,8 @@ class DriveSuprimAgent(AbstractAgent):
         Compute the student loss using teacher soft label.
         """
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]
         if self._config.soft_label_traj == 'first':
@@ -254,7 +253,7 @@ class DriveSuprimAgent(AbstractAgent):
                 batch_indices = torch.arange(batch_size, device=selected_indices_i.device).unsqueeze(1).expand(-1, topk)
                 scores[k] = full_scores[batch_indices, selected_indices_i]  # [bs, topk_stage_i]
             _kwargs = {}
-            if self._config.lab.use_imi_learning_in_refinement:
+            if self._config.refinement.use_imi_learning_in_refinement:
                 _kwargs['targets'] = { 'trajectory': targets['ori_trajectory'] }
                 pred_i['trajectory_vocab'] = trajectory_vocab
             ori_loss_i = drivesuprim_agent_loss_single_refine_stage(pred_i, self._config, scores, **_kwargs)
@@ -275,7 +274,7 @@ class DriveSuprimAgent(AbstractAgent):
             with open(os.path.join(self.aug_vocab_pdm_score_dir, f'{token}.pkl'), 'rb') as f:
                 _aug_vocab_pdm_score[token] = pickle.load(f)
         aug_loss_all_mode_lst = []  # a mode means a specific rotation angle
-        for idx in range(self._config.student_rotation_ensemble):
+        for idx in range(self._config.ego_perturb.n_student_rotation_ensemble):
             aug_loss_lst = []
             aug_idx_predictions = predictions[idx+1]['refinement']
             for i in range(num_refinement_stage):
@@ -289,7 +288,7 @@ class DriveSuprimAgent(AbstractAgent):
                     batch_indices = torch.arange(batch_size, device=aug_idx_selected_indices_i.device).unsqueeze(1).expand(-1, topk)
                     scores[k] = full_scores[batch_indices, aug_idx_selected_indices_i]
                 _kwargs_idx = {}
-                if self._config.lab.use_imi_learning_in_refinement:
+                if self._config.refinement.use_imi_learning_in_refinement:
                     _kwargs_idx['targets'] = { 'trajectory': targets['rotated_trajectories'][idx] }
                     aug_idx_pred_i['trajectory_vocab'] = trajectory_vocab
                 aug_loss_lst.append(drivesuprim_agent_loss_single_refine_stage(aug_idx_pred_i, self._config, scores, **_kwargs_idx))

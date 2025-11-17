@@ -19,6 +19,9 @@ class DriveSuprimModel(nn.Module):
     def __init__(self, config: DriveSuprimConfig):
         super().__init__()
 
+        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+        #     import pdb; pdb.set_trace()
+
         self._config = config
         assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet34', 'resnet50', 'eva', 'moe', 'moe_ult32', 'swin', 'sptr']
         if config.backbone_type == 'eva':
@@ -31,7 +34,6 @@ class DriveSuprimModel(nn.Module):
         self._keyval_embedding = nn.Embedding(
             config.img_vert_anchors * config.img_horz_anchors * img_num, config.tf_d_model
         )
-        # self._query_embedding = nn.Embedding(sum(self._query_splits), config.tf_d_model)
 
         # usually, the BEV features are variable in size.
         self.downscale_layer = nn.Conv2d(self._backbone.img_feat_c, config.tf_d_model, kernel_size=1)
@@ -46,9 +48,6 @@ class DriveSuprimModel(nn.Module):
             vocab_path=config.vocab_path,
             config=config
         )
-
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
 
         self.use_multi_stage = self._config.refinement.use_multi_stage
         if self.use_multi_stage:
@@ -84,8 +83,8 @@ class DriveSuprimModel(nn.Module):
                 masks=None,
                 tokens=None) -> Dict[str, torch.Tensor]:
         
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
         
         output: Dict[str, torch.Tensor] = {}
 
@@ -203,8 +202,8 @@ class HydraTrajHead(nn.Module):
 
     def forward(self, img_feature, status_encoding, tokens=None) -> Dict[str, torch.Tensor]:
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         vocab = self.vocab.data  # [n_vocab, 40, 3]
         L, HORIZON, _ = vocab.shape
@@ -343,7 +342,7 @@ class RefineTrajHead(nn.Module):
             ),
         })
 
-        if self._config.lab.use_imi_learning_in_refinement:
+        if self._config.refinement.use_imi_learning_in_refinement:
             heads['imi'] = nn.Sequential(
                 nn.Linear(d_model, d_ffn),
                 nn.ReLU(),
@@ -368,8 +367,8 @@ class RefineTrajHead(nn.Module):
 
     def forward(self, img_feat, refinement_dict) -> Dict[str, torch.Tensor]:
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
+        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
+            import pdb; pdb.set_trace()
 
         B = img_feat.shape[0]
         
@@ -405,7 +404,7 @@ class RefineTrajHead(nn.Module):
                       ).log()
             )
 
-            if self._config.lab.use_imi_learning_in_refinement:
+            if self._config.refinement.use_imi_learning_in_refinement:
                 scores += 0.02 * last_layer_result['imi'].softmax(-1).log()
 
             if i != self.num_stage-1:
