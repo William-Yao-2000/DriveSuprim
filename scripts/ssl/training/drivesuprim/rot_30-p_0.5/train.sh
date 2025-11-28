@@ -35,7 +35,7 @@ rot=30
 probability=0.5
 
 
-dir=training/drivesuprim-$agent/rot_$rot-p_$probability/stage_layers_$stage_layers-topks_$topks
+dir=training/$agent/rot_$rot-p_$probability/stage_layers_$stage_layers-topks_$topks
 
 
 command_string="$NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
