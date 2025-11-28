@@ -26,17 +26,13 @@ else
   epoch=8
 fi
 
-echo "Using agent: $agent, setting epoch: $epoch\n"
-
 config="competition_training"
 bs=8
 lr=0.000075
 rot=30
 probability=0.5
 
-
-dir=training/drivesuprim-$agent/rot_$rot-p_$probability/stage_layers_$stage_layers-topks_$topks
-
+dir=training/$agent/rot_$rot-p_$probability/stage_layers_$stage_layers-topks_$topks
 
 ckpt_epoch=$5
 # Format epoch with leading zero
@@ -51,6 +47,8 @@ if [ -z "$resume" ]; then
     echo -e "Wrong! You need to provide the resume model name!"
     exit 1
 fi
+
+echo "Using agent: $agent, setting epoch: $epoch, start from epoch: $ckpt_epoch\n"
 
 command_string="$NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=false \
