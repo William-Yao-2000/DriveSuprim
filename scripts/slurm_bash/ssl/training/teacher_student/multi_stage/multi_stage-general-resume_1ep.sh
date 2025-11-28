@@ -5,13 +5,14 @@ num_refinement_stage=$3
 stage_layers=$4
 topks=$5
 partition=$6
+start_epoch=$7
 
 dir_name=$(echo $bash_file-$agent-$stage_layers-$topks | tr '/' '-' | tr '.' 'dot')
 
 PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
 
-for epoch in $(seq 0 1 8)
+for epoch in $(seq $start_epoch 1 8)
 do
     echo $epoch
     submit_job \
@@ -38,5 +39,5 @@ usage:
 bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/multi_stage-general-resume_1ep.sh \
     scripts/ssl/training/drivesuprim/rot_30-p_0.5/train-resume.sh \
     drivesuprim_agent_r34 1 3 256 \
-    interactive
+    interactive 0
 '
