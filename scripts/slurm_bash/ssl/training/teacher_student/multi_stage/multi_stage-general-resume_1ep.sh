@@ -14,7 +14,7 @@ PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
 for epoch in $(seq $start_epoch 1 8)
 do
-    echo $epoch
+    echo "start epoch: $epoch"
     submit_job \
         --gpu 8 \
         --tasks_per_node 1 \
