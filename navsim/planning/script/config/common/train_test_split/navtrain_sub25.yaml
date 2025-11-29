@@ -1,3 +1,0 @@
-data_split: trainval
-defaults:
-- scene_filter: navtrain_sub25

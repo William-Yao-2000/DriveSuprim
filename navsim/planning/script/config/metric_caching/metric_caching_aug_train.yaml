@@ -16,11 +16,6 @@ metric_cache_path: ${oc.env:NAVSIM_EXP_ROOT}/metric_cache
      
 force_feature_computation: True
 
-aug_train:
-  translation: 0
-  rotation: 30.0  # degree, positive: turn left
-  va: 0  # vel and accs
-
 offline_aug_file: null
 
 output_dir: ${metric_cache_path}/metadata

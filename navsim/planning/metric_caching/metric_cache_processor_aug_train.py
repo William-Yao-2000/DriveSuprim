@@ -53,9 +53,6 @@ class MetricCacheProcessorAugTrain:
 
         with open(cfg.offline_aug_file, 'r') as f:
             aug_data = json.load(f)
-            assert aug_data['param']['rot'] == cfg.aug_train.rotation and \
-                   aug_data['param']['trans'] == cfg.aug_train.translation and \
-                   aug_data['param'].get('va', 0) == cfg.aug_train.va
             self.aug_info = aug_data['tokens']
 
         # 1s additional observation for ttc metric
@@ -346,7 +343,6 @@ class MetricCacheProcessorAugTrain:
             import pdb; pdb.set_trace()
         _rotation = self.aug_info[scenario.token]['rot']
         _rotation = _rotation / 360.0 * (2*np.pi)
-        _translation = self.aug_info[scenario.token]['trans']
         _vel = self.aug_info[scenario.token].get('vel', 0)
         _acc = self.aug_info[scenario.token].get('acc', 0)
 

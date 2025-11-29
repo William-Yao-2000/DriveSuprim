@@ -22,8 +22,6 @@ simulator:
 
 
 aug_train:
-  rotation: 0
-  translation: 0
-  va: 0.0
+  rotation: 30
   percentage: 0.5
   seed: 2024

@@ -1,4 +1,0 @@
-defaults:
-  - scene_filter: navtest_vis
-
-data_split: test

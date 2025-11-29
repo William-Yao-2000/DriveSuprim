@@ -38,12 +38,12 @@ def main(cfg: DictConfig) -> None:
     vocab_size = cfg.vocab_size
     scene_filter_name = cfg.scene_filter_name
     traj_path = f"{devkit_root}/traj_final/test_{vocab_size}_kmeans.npy"
-    rot, trans, va = cfg.aug_train.rotation, cfg.aug_train.translation, cfg.aug_train.va
+    rot = cfg.aug_train.rotation
+    percentage = cfg.aug_train.percentage
     seed = cfg.aug_train.seed
     dir_component = []
-    dir_component.append(f"rot_{rot}-trans_{trans}")
-    dir_component.append(f"va_{va}")
-    dir_component.append(f"p_{cfg.aug_train.percentage}")
+    dir_component.append(f"rot_{rot}")
+    dir_component.append(f"p_{percentage}")
     dir_component.append(f"seed_{seed}")
     dir_component = '-'.join(dir_component)
     dir = f'random_aug/{dir_component}/vocab_score_{vocab_size}_{scene_filter_name}'
