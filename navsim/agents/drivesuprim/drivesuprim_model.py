@@ -68,10 +68,10 @@ class DriveSuprimModel(nn.Module):
     def img_feat_blc_dict(self, camera_feature, **kwargs):
         img_features = self._backbone(camera_feature, **kwargs)
         img_feat_dict = {
-            'patch_token': img_features,  # [bs, c_img, h//32, w//32]
+            'patch_token': img_features,  # [bs, c_img, h_avg, w_avg]
         }
-        img_features = self.downscale_layer(img_features).flatten(-2, -1)  # [bs, c, h//32 * w//32]
-        img_features = img_features.permute(0, 2, 1)  # [bs, h//32 * w//32, c]
+        img_features = self.downscale_layer(img_features).flatten(-2, -1)  # [bs, c, h_avg * w_avg]
+        img_features = img_features.permute(0, 2, 1)  # [bs, h_avg * w_avg, c]
         img_feat_dict['avg_feat'] = img_features
         return img_feat_dict
 
@@ -93,12 +93,12 @@ class DriveSuprimModel(nn.Module):
         if isinstance(camera_feature, list):
             camera_feature = camera_feature[-1]  # [bs, 3, h, w], [-1] means present frame camera input
 
-        img_feat_dict = self.img_feat_blc_dict(camera_feature, masks=masks, return_class_token=True)
+        img_feat_dict = self.img_feat_blc_dict(camera_feature, masks=masks, return_class_token=False)
 
         status_encoding = self._status_encoding(status_feature)  # [bs, 8] -> [bs, c]
 
-        keyval = img_feat_dict.pop('avg_feat')  # [bs, h//32 * w//32, c]
-        keyval += self._keyval_embedding.weight[None, ...]  # [bs, h//32 * w//32, c]
+        keyval = img_feat_dict.pop('avg_feat')  # [bs, h_avg * w_avg, c]
+        keyval += self._keyval_embedding.weight[None, ...]  # [bs, h_avg * w_avg, c]
 
         output.update(img_feat_dict)
         trajectory = self._trajectory_head(keyval, status_encoding, tokens=tokens)
@@ -374,7 +374,7 @@ class RefineTrajHead(nn.Module):
         
         for i in range(self.num_stage):
             _img_feat_fg = self.downscale_layers[i](img_feat).flatten(2)
-            _img_feat_fg = _img_feat_fg.permute(0, 2, 1)  # [bs, h//32 * w//32, c]
+            _img_feat_fg = _img_feat_fg.permute(0, 2, 1)  # [bs, h_avg * w_avg, c]
             status_encoding = refinement_dict[-1]['trajs_status']  # [bs, topk_stage_i, c]
             tr_out_lst = self.transformer_blocks[i](status_encoding, _img_feat_fg)  # [layer_stage_i, bs, topk_stage_i, c]
 
