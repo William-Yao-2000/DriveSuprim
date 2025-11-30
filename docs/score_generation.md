@@ -1,10 +1,10 @@
 # Trajectory Score Generation
 
-For each scenario in NAVSIM, we need to generate the rule-based metric score for the trajectories in the pre-defined trajectory vocabulary. The full steps are as follows.
+For each scenario in NAVSIM, we need to generate the rule-based metric score for the trajectories in the pre-defined trajectory vocabulary, which is used in model training. The full steps are as follows.
 
 (For debugging, you can implement the steps on the `navtrain_debug` split.)
 
-### 1. Dataset Metric Cache
+### 1. Dataset Metric Caching
 
 ```bash
 python navsim/planning/script/run_metric_caching.py train_test_split=navtrain \

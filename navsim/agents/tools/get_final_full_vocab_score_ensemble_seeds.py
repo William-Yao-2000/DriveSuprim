@@ -5,37 +5,40 @@ from collections import defaultdict
 traj_root = os.getenv('NAVSIM_TRAJPDM_ROOT')
 
 if __name__ == '__main__':
-    import pdb; pdb.set_trace()
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--rot', type=int, default=30, help='rotation augmentation')
-    parser.add_argument('--trans', type=int, default=0, help='translation augmentation')
-    parser.add_argument('--va', type=float, default=0, help='view angle augmentation')
     parser.add_argument('--percentage', type=float, default=0.5, help='percentage of data to use')
+    parser.add_argument('--begin_seed', type=int, default=2024, help='begin seed')
+    parser.add_argument('--end_seed', type=int, default=2026, help='end seed')
+    parser.add_argument('--debug_split', action='store_true', help='use debug split')
     args = parser.parse_args()
     
-    rot, trans, va = args.rot, args.trans, args.va
+    rot = args.rot
     percentage = args.percentage
     all_data = defaultdict(list)
 
     old_out_dir_prefix = 'random_aug/'
     parts = []
-    parts.append(f'rot_{rot}-trans_{trans}')
-    if va == 0:
-        va = int(va)
-    parts.append(f'va_{va}')
-    
+    parts.append(f'rot_{rot}')
+
     if len(parts) > 0:
         old_out_dir_prefix += '-'.join(parts)
     old_out_dir_prefix += f'-p_{percentage}'
 
-    for seed in range(2024, 2027):
+    for seed in range(args.begin_seed, args.end_seed + 1):
         
         old_out_dir = old_out_dir_prefix + f'-seed_{seed}'
+        old_out_dir = f'{old_out_dir}/vocab_score_8192_navtrain'
 
-        old_out_dir = f'{old_out_dir}/vocab_score_8192_navtrain_final'
+        if args.debug_split:
+            old_out_dir += '_debug'
 
         curr_pickle_path = f'{traj_root}/{old_out_dir}/navtrain.pkl'
+
+        if args.debug_split:
+            curr_pickle_path = curr_pickle_path.replace('.pkl', '_debug.pkl')
+
         curr_pickle = pickle.load(open(curr_pickle_path, 'rb'))
         print("------------")
         print(curr_pickle_path, len(curr_pickle))
@@ -47,5 +50,11 @@ if __name__ == '__main__':
     assert all([len(v) == 3 for v in all_data.values()])
 
     new_out_dir = old_out_dir_prefix + '-ensemble'
+    if args.debug_split:
+        new_out_dir += '_debug'
+
     os.makedirs(f'{traj_root}/{new_out_dir}', exist_ok=True)
-    pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/navtrain_ensemble.pkl', 'wb'))
+    if args.debug_split:
+        pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/navtrain_debug_ensemble.pkl', 'wb'))
+    else:
+        pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/navtrain_ensemble.pkl', 'wb'))

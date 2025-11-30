@@ -32,7 +32,7 @@
 - [Dataset Splits](docs/splits.md)
 - [Trajectory Score Generation](docs/score_generation.md)
 - [Augmented Data Generation](docs/augmentation.md)
-- [Training and Evaluation](docs/evaluation.md)
+- [Training and Evaluation](docs/train_eval.md)
 
 ## Model Checkpoints
 

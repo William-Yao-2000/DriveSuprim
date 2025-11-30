@@ -54,7 +54,7 @@ torchrun --nproc_per_node=8 --master_port=29500 $command_string
 
 : '
 usage:
-bash scripts/ssl/evaluation/eval_r34-multi_stage.sh \
+bash scripts/drivesuprim/evaluation/eval.sh \
     8 training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 \
     1 3 256 hydra_img_r34_ssl teacher
 '

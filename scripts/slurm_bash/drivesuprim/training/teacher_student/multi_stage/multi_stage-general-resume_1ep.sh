@@ -36,8 +36,8 @@ done
 
 : '
 usage:
-bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/multi_stage-general-resume_1ep.sh \
-    scripts/ssl/training/drivesuprim/rot_30-p_0.5/train-resume.sh \
+bash scripts/slurm_bash/drivesuprim/training/teacher_student/multi_stage/multi_stage-general-resume_1ep.sh \
+    scripts/drivesuprim/training/rot_30-p_0.5/train-resume.sh \
     drivesuprim_agent_r34 1 3 256 \
     interactive 0
 '

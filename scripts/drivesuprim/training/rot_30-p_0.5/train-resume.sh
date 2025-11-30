@@ -26,22 +26,35 @@ else
   epoch=8
 fi
 
-echo "Using agent: $agent, setting epoch: $epoch\n"
-
 config="competition_training"
 bs=8
 lr=0.000075
 rot=30
 probability=0.5
 
-
 dir=training/$agent/rot_$rot-p_$probability/stage_layers_$stage_layers-topks_$topks
 
+ckpt_epoch=$5
+# Format epoch with leading zero
+padded_ckpt_epoch=$(printf "%02d" $ckpt_epoch)
+
+# Calculate step from epoch (1330 steps per epoch)
+step=$((($ckpt_epoch + 1) * 1330))
+
+resume="epoch=${padded_ckpt_epoch}-step=${step}.ckpt"
+
+if [ -z "$resume" ]; then
+    echo -e "Wrong! You need to provide the resume model name!"
+    exit 1
+fi
+
+echo "Using agent: $agent, setting epoch: $epoch, start from epoch: $ckpt_epoch\n"
 
 command_string="$NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     +debug=false \
     agent=$agent \
     experiment_name=$dir \
+    +resume_ckpt_path='$NAVSIM_EXP_ROOT/$dir/$resume' \
     split=trainval \
     train_test_split=navtrain \
     dataloader.params.batch_size=$bs \
@@ -71,6 +84,6 @@ torchrun --nproc_per_node=8 --master_port=29500 $command_string
 
 : '
 usage:
-bash scripts/ssl/training/drivesuprim/rot_30-p_0.5/train.sh \
-  drivesuprim_agent_r34 1 3 256
+bash scripts/drivesuprim/training/rot_30-p_0.5/train-resume.sh \
+  drivesuprim_agent_r34 1 3 256 2
 '

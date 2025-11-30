@@ -13,7 +13,7 @@ Augmentation Data Generation is time-consuming. You can also directly download o
 Each augmentation file specifies a random seed, and assigns a rotation angle to each scenario.\
 We ensemble multiple augmentation files to form larger augmented dataset, which means that each scenario is related to multiple rotation angles.
 
-#### Generate augmentation file
+#### 1.1 Generate augmentation file
 
 You can change the rotation boundary, augmentation percentage, and random seed to generate different augmentation files.
 
@@ -21,7 +21,7 @@ You can change the rotation boundary, augmentation percentage, and random seed t
 python navsim/agents/tools/gen_offline_training_aug_file.py --rot=30 --percentage=0.5 --seed=2024
 ```
 
-#### Offline file ensemble
+#### 1.2 Offline file ensemble
 
 This ensembled file is used in model training. Here we ensemble files with random seed from 2024 to 2026.
 
@@ -58,12 +58,12 @@ python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=n
 
 ### 3. Generate PDM Score for the Full Vocabulary with Augmented Data
 
-#### Generate PDM Score
+#### 3.1 Generate PDM Score
 
 This process can be time consuming. You can split the `navtrain` set into multiple subsets (e.g., `navtrain_sub1`, `navtrain_sub2`, ...) and parallelly run the script on several cpu machines.
 
 ```bash
-bash scripts/gen_full_score_aug/gen_training_full_score_aug.sh navtrain 30 0.5 2024
+bash scripts/drivesuprim/gen_full_score_aug/gen_training_full_score_aug.sh 30 0.5 2024
 ```
 
 <details>
@@ -89,8 +89,38 @@ python navsim/agents/tools/gen_vocab_full_score_aug_train.py train_test_split=na
 </details>
 
 
-#### Ensemble and split into pickles
+#### 3.2 Ensemble and split into pickles
+
+##### 3.2.1 Ensemble
+
+Ensemble the PDM scores across multiple seeds.
+
+```bash
+python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=30 --percentage=0.5 --begin_seed=2024 --end_seed=2026
+```
+
+<details>
+<summary>Debug split</summary>
+
+```bash
+python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=30 --percentage=0.5 --begin_seed=2024 --end_seed=2026 --debug_split
+```
+
+</details>
+
+##### 3.2.2 Split emsembled pkl file
 
 Split the ensembled file into multiple pickle files named by the scenario token, which is used in training.
 
+```bash
+python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --percentage=0.5
+```
 
+<details>
+<summary>Debug split</summary>
+
+```bash
+python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --percentage=0.5 --debug_split
+```
+
+</details>
