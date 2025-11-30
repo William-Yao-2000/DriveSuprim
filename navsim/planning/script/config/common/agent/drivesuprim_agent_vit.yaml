@@ -1,0 +1,83 @@
+_target_: navsim.agents.drivesuprim.drivesuprim_agent.DriveSuprimAgent
+_convert_: 'all'
+pdm_split: navtrain
+metrics:
+  - no_at_fault_collisions
+  - drivable_area_compliance
+  - time_to_collision_within_bound
+  - ego_progress
+  - driving_direction_compliance
+  - lane_keeping
+  - traffic_light_compliance
+  - history_comfort
+
+config:
+  _target_: navsim.agents.drivesuprim.drivesuprim_config.DriveSuprimConfig
+  _convert_: 'all'
+  ckpt_path: drivesuprim_8192_ckpt
+  
+  trajectory_imi_weight: 1.0
+
+  vocab_size: 8192
+  vocab_path: ${oc.env:NAVSIM_DEVKIT_ROOT}/traj_final/test_8192_kmeans.npy
+  normalize_vocab_pos: True
+  
+  sigma: 0.5
+  vadv2_head_nlayers: 3
+
+  trajectory_sampling:
+    _target_: nuplan.planning.simulation.trajectory.trajectory_sampling.TrajectorySampling
+    _convert_: 'all'
+    time_horizon: 4
+    interval_length: 0.1
+  
+  backbone_type: 'vit'
+  vit_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/da_vitl16.pth
+  intern_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/intern_object365.pth
+  vov_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/dd3d_det_final.pth
+  lr_mult_backbone: 1.0
+
+  n_camera: 3
+
+  camera_width: 1024
+  camera_height: 256
+  img_vert_anchors: 8
+  img_horz_anchors: 32
+
+  training: True
+
+  # Augmentation settings
+  only_ori_input: false
+  ego_perturb:
+    _target_: navsim.agents.drivesuprim.drivesuprim_config.EgoPerturbConfig
+    _convert_: 'all'
+    n_student_rotation_ensemble: 3
+    offline_aug_angle_boundary: 30.0
+    offline_aug_file: null
+
+  ori_vocab_pdm_score_full_path: "aaa.pkl"
+  aug_vocab_pdm_score_dir: "ccc"
+
+  # Self-distillation
+  soft_label_traj: 'first'
+  soft_label_imi_diff_thresh: 1.0
+  soft_label_score_diff_thresh: 0.15
+
+  refinement:
+    _target_: navsim.agents.drivesuprim.drivesuprim_config.RefinementConfig
+    use_multi_stage: true
+    num_refinement_stage: 1
+    stage_layers: "3"
+    topks: "256"
+    use_mid_output: true
+    use_separate_stage_heads: true
+    use_imi_learning_in_refinement: true
+  
+  inference:
+    _target_: navsim.agents.drivesuprim.drivesuprim_config.InferConfig
+    model: teacher
+    use_first_stage_traj_in_infer: false
+    save_pickle: false
+
+checkpoint_path: null
+lr: 1e-4

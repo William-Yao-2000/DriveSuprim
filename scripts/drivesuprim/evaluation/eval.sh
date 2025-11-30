@@ -19,9 +19,9 @@ metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep-one_stage"
+    experiment_name="${dir}/test-${padded_epoch}ep"
 else
-    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}-one_stage"
+    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}"
 fi
 
 command_string="${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
