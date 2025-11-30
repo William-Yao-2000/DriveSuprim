@@ -161,7 +161,7 @@ class AgentLightningModuleSSL(pl.LightningModule):
         features, targets, tokens = batch
         self.agent.eval()
         with torch.no_grad():
-            predictions, _, _ = self.agent.forward(batch)
+            predictions, _ = self.agent.forward(batch)
             if self._cfg.refinement.use_multi_stage and not self._cfg.inference.use_first_stage_traj_in_infer:
                 poses = predictions['final_traj'].cpu().numpy()
             else:
