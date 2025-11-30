@@ -1,27 +1,21 @@
 #!/bin/bash
 
 # Default values
-epoch=$1
-dir=${2:-"training/ssl/ori/lr_baseline"}
+dir=$1
+file=$2
 num_refinement_stage=$3
 stage_layers=$4
 topks=$5
 agent=${6:-"drivesuprim_agent_r34"}
 inference_model=${7:-"teacher"}
 
-# Format epoch with leading zero
-padded_epoch=$(printf "%02d" $epoch)
-
-# Calculate step from epoch (1330 steps per epoch)
-step=$((($epoch + 1) * 1330))
-
 metric_cache_path="${NAVSIM_EXP_ROOT}/metric_cache/test/ori"
 
 # Set experiment name based on inference model
 if [ "$inference_model" = "teacher" ]; then
-    experiment_name="${dir}/test-${padded_epoch}ep"
+    experiment_name="${dir}/test-${file}"
 else
-    experiment_name="${dir}/test-${padded_epoch}ep-${inference_model}"
+    experiment_name="${dir}/test-${file}-${inference_model}"
 fi
 
 command_string="${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_stage_gpu_ssl.py \
@@ -31,7 +25,7 @@ command_string="${NAVSIM_DEVKIT_ROOT}/navsim/planning/script/run_pdm_score_one_s
     train_test_split=navtest \
     dataloader.params.batch_size=8 \
     worker.threads_per_node=128 \
-    agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/epoch=${padded_epoch}-step=${step}.ckpt' \
+    agent.checkpoint_path='${NAVSIM_EXP_ROOT}/${dir}/${file}.ckpt' \
     agent.config.training=false \
     agent.config.only_ori_input=true \
     agent.config.inference.model=${inference_model} \
@@ -54,7 +48,7 @@ torchrun --nproc_per_node=8 --master_port=29500 $command_string
 
 : '
 usage:
-bash scripts/drivesuprim/evaluation/eval.sh \
-    8 training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 \
+bash scripts/drivesuprim/evaluation/eval_file.sh \
+    training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 drivesuprim_r34 \
     1 3 256 drivesuprim_agent_r34 teacher
 '
