@@ -1,12 +1,12 @@
 #!/bin/bash
 epoch=$1
 dir=$2
-partition=$3
-agent=hydra_img_r34_ssl
+agent=$3
+partition=$4
 
 # Parse additional arguments
 # TODO: use dir to get these parameters
-for arg in "${@:4}"; do
+for arg in "${@:5}"; do
   case $arg in
     -num_refinement_stage=*)
       num_refinement_stage="${arg#*=}"
@@ -33,20 +33,20 @@ submit_job \
     --nodes 1 \
     -n "eval-navsim_ssl-$dir_name-${epoch}epoch" \
     --image $PREFIX_PATH/container_images/ywh-navsim.sqsh \
-    --logroot $PREFIX_PATH/slurm_logs/navsim_v2/evaluation/ \
+    --logroot $PREFIX_PATH/slurm_logs/navsim_v2/evaluation-$agent \
     --email_mode never \
     --duration 4 \
     --dependent_clones 0 \
     --partition $partition \
     --account av_research \
-    -c ". $PREFIX_PATH/pre-navsim_v2.sh; bash scripts/ssl/evaluation/eval_r34-multi_stage.sh \
+    -c ". $PREFIX_PATH/pre-navsim_v2.sh; bash scripts/drivesuprim/evaluation/eval.sh \
         $epoch $dir $num_refinement_stage $stage_layers $topks $agent $inference_model"
 
 
 : '
 usage:
 bash scripts/slurm_bash/ssl/evaluation/eval_r34-multi_stage.sh \
-    8 training/ssl/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/labs-r34/stage_layers_3-topks_256-imi_thresh_2.0 \
-    interactive \
+    8 training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 \
+    drivesuprim_agent_r34 interactive \
     -num_refinement_stage=1 -stage_layers=3 -topks=256 -inference_model=teacher
 '
