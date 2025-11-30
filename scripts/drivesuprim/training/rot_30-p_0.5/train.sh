@@ -20,10 +20,10 @@ if [ "$valid_agent" == false ]; then
 fi
 
 # Set epoch value based on agent type
-if [ "$agent" == "drivesuprim_agent_r34" ] || [ "$agent" == "drivesuprim_agent_r50" ]; then
+if [ "$agent" == "drivesuprim_agent_r34" ] || [ "$agent" == "drivesuprim_agent_r50" ] || [ "$agent" == "drivesuprim_agent_vov" ]; then
   epoch=10
 else
-  epoch=8
+  epoch=6
 fi
 
 echo "Using agent: $agent, setting epoch: $epoch\n"

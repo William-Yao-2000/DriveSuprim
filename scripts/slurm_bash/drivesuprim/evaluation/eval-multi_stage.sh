@@ -46,7 +46,7 @@ submit_job \
 : '
 usage:
 bash scripts/slurm_bash/drivesuprim/evaluation/eval-multi_stage.sh \
-    9 training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 \
-    drivesuprim_agent_r34 interactive \
+    5 training/drivesuprim_prev_ckpts/stage_layers_3-topks_256-vit \
+    drivesuprim_agent_vit interactive \
     -num_refinement_stage=1 -stage_layers=3 -topks=256 -inference_model=teacher
 '

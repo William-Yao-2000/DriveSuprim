@@ -110,7 +110,7 @@ python navsim/agents/tools/get_final_full_vocab_score_ensemble_seeds.py --rot=30
 
 ##### 3.2.2 Split emsembled pkl file
 
-Split the ensembled file into multiple pickle files named by the scenario token, which is used in training.
+Split the ensembled file into multiple pickle files named by the scenario token, which are used in training.
 
 ```bash
 python navsim/agents/tools/split_final_ensemble_pickle.py --rot=30 --percentage=0.5
