@@ -53,8 +53,8 @@ if __name__ == '__main__':
     if args.debug_split:
         new_out_dir += '_debug'
 
-    os.makedirs(f'{traj_root}/{new_out_dir}', exist_ok=True)
+    os.makedirs(f'{traj_root}/{new_out_dir}/vocab_score_8192_navtrain_final', exist_ok=True)
     if args.debug_split:
-        pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/navtrain_debug_ensemble.pkl', 'wb'))
+        pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/vocab_score_8192_navtrain_final/navtrain_debug_ensemble.pkl', 'wb'))
     else:
-        pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/navtrain_ensemble.pkl', 'wb'))
+        pickle.dump(all_data, open(f'{traj_root}/{new_out_dir}/vocab_score_8192_navtrain_final/navtrain_ensemble.pkl', 'wb'))

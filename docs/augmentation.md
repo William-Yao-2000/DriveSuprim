@@ -3,9 +3,12 @@
 For each scenario in NAVSIM, we need to generate the rotation-based augmentation data.\
 Specifically, we specify several rotation angles for each scenario, revise the ego pose, and generate the pdm score for each augmented scenario. The main procedure is the same as the score generation.
 
-Augmentation Data Generation is time-consuming. You can also directly download our generated augmentation data.
+For debugging, you can implement the steps on the `navtrain_debug` split.
 
-(For debugging, you can implement the steps on the `navtrain_debug` split.)
+> Augmentation Data Generation is time-consuming. You can also ignore the steps below and directly download our generated augmentation data:
+> - Offline augmentation file: [rot_30-p_0.5-ensemble.json](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/offline_files/training_ego_aug_files/rot_30-p_0.5-ensemble.json)
+> - Splited pickle files containing pdm score (stored in .tar): [vocab_score_8192_navtrain_final-rot_30-p_0.5-ensemble.tar](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/traj_pdm_v2/random_aug/vocab_score_8192_navtrain_final-rot_30-p_0.5-ensemble.tar)
+
 
 
 ### 1. Generate offline augmentation file
@@ -15,7 +18,7 @@ We ensemble multiple augmentation files to form larger augmented dataset, which 
 
 #### 1.1 Generate augmentation file
 
-You can change the rotation boundary, augmentation percentage, and random seed to generate different augmentation files.
+You can change the **rotation boundary**, **augmentation percentage**, and **random seed** to generate different augmentation files.
 
 ```bash
 python navsim/agents/tools/gen_offline_training_aug_file.py --rot=30 --percentage=0.5 --seed=2024

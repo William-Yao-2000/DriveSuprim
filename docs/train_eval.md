@@ -2,9 +2,48 @@
 
 ## Training
 
+Before training, please make sure you have prepared all the required data, including the NAVSIM dataset, the offline augmentation file, and the PDM Score data. Your directory should be assigned as follows:
+
+```angular2html
+~/drivesuprim_workspace
+├── DriveSuprim
+├── dataset
+│   ├── maps
+│   ├── navsim_logs
+│   ├── sensor_blobs
+│   └── traj_pdm_v2
+│       ├── ori
+│       │   └── vocab_score_8192_navtrain_final
+│       │       └── navtrain.pkl
+│       └── random_aug
+│           └── rot_30-p_0.5-ensemble
+│               └── vocab_score_8192_navtrain_final
+│                   └── split_pickles
+└── exp_v2
+    ├── offline_files
+    │   └── training_ego_aug_files
+    │       └── rot_30-p_0.5-ensemble.json
+    └── models
+```
+
 ### 1. Download pre-trained weight of backbones
 
-TODO
+Before running the training script, you need to download the pre-trained weight of backbones, including V2-99 and ViT-Large.
+
+- V2-99: [dd3d_det_final.pth](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/pretrained_backbones/dd3d_det_final.pth)
+- ViT-Large: [da_vitl16.pth](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/pretrained_backbones/da_vitl16.pth)
+
+Then place them in the `$NAVSIM_EXP_ROOT/models` folder.
+
+```angular2html
+~/drivesuprim_workspace
+├── DriveSuprim
+├── dataset
+└── exp_v2
+    └── models
+         ├── da_vitl16.pth
+         └── dd3d_det_final.pth
+```
 
 ### 2. Run training script
 ```bash
@@ -35,19 +74,49 @@ python navsim/planning/script/run_metric_caching.py train_test_split=navtest \
 
 ### 2. Run evaluation script
 
+We provide two bash file for evaluation. You can choose one of them to run according to your need.
+- `eval_epoch.sh`: evaluate the model on a specific epoch
+- `eval_file.sh`: evaluate the model on a specific checkpoint file
+
+#### 2.1 Evaluate on a specific epoch
+
+After training for several epochs, you can evaluate the model on a specific epoch.
+
 ```bash
 # ResNet34
-bash scripts/drivesuprim/evaluation/eval.sh \
+bash scripts/drivesuprim/evaluation/eval_epoch.sh \
     9 training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 \
     1 3 256 drivesuprim_agent_r34 teacher
 
 # V2-99
-bash scripts/drivesuprim/evaluation/eval.sh \
+bash scripts/drivesuprim/evaluation/eval_epoch.sh \
     9 training/drivesuprim_agent_vov/rot_30-p_0.5/stage_layers_3-topks_256 \
     1 3 256 drivesuprim_agent_vov teacher
 
 # ViT-Large
-bash scripts/drivesuprim/evaluation/eval.sh \
+bash scripts/drivesuprim/evaluation/eval_epoch.sh \
     5 training/drivesuprim_agent_vit/rot_30-p_0.5/stage_layers_3-topks_256 \
+    1 3 256 drivesuprim_agent_vit teacher
+```
+
+
+#### 2.2 Evaluate on a specific checkpoint file
+
+You can download our model checkpoint from [here](https://huggingface.co/alkaid-2000/DriveSuprim/tree/main/model_ckpt). For more details, please refer to the [README](../README.md) file.
+
+```bash
+# ResNet34
+bash scripts/drivesuprim/evaluation/eval_file.sh \
+    model_ckpt drivesuprim_r34 \
+    1 3 256 drivesuprim_agent_r34 teacher
+
+# V2-99
+bash scripts/drivesuprim/evaluation/eval_file.sh \
+    model_ckpt drivesuprim_vov \
+    1 3 256 drivesuprim_agent_vov teacher
+
+# ViT-Large
+bash scripts/drivesuprim/evaluation/eval_file.sh \
+    model_ckpt drivesuprim_vit \
     1 3 256 drivesuprim_agent_vit teacher
 ```

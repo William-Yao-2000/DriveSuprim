@@ -29,11 +29,12 @@ if __name__ == '__main__':
     out_dir = old_out_dir_prefix + '-ensemble'
     if args.debug_split:
         out_dir += '_debug'
-    pkl_file = f'{traj_root}/{out_dir}/navtrain_ensemble.pkl'
+    vocab_part = 'vocab_score_8192_navtrain_final'
+    pkl_file = f'{traj_root}/{out_dir}/{vocab_part}/navtrain_ensemble.pkl'
     if args.debug_split:
-        pkl_file = f'{traj_root}/{out_dir}/navtrain_debug_ensemble.pkl'
+        pkl_file = f'{traj_root}/{out_dir}/{vocab_part}/navtrain_debug_ensemble.pkl'
     pkl_data = pickle.load(open(pkl_file, 'rb'))
-    os.makedirs(f'{traj_root}/{out_dir}/split_pickles', exist_ok=True)
+    os.makedirs(f'{traj_root}/{out_dir}/{vocab_part}/split_pickles', exist_ok=True)
     for k, v in tqdm(pkl_data.items()):
-        with open(f'{traj_root}/{out_dir}/split_pickles/{k}.pkl', 'wb') as f:
+        with open(f'{traj_root}/{out_dir}/{vocab_part}/split_pickles/{k}.pkl', 'wb') as f:
             pickle.dump(v, f)
