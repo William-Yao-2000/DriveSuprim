@@ -30,8 +30,8 @@ Before training, please make sure you have prepared all the required data, inclu
 
 Before running the training script, you need to download the pre-trained weight of backbones, including V2-99 and ViT-Large.
 
-- V2-99: [dd3d_det_final.pth](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/pretrained_backbones/dd3d_det_final.pth)
-- ViT-Large: [da_vitl16.pth](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/pretrained_backbones/da_vitl16.pth)
+- V2-99: [dd3d_det_final.pth](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/pretrained_backbones/dd3d_det_final.pth)
+- ViT-Large: [da_vitl16.pth](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/pretrained_backbones/da_vitl16.pth)
 
 Then place them in the `$NAVSIM_EXP_ROOT/models` folder.
 

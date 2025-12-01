@@ -19,11 +19,8 @@
 > <sup>2</sup>Shanghai Collaborative Innovation Center of Intelligent Visual Computing \
 > <sup>3</sup>NVIDIA
 >
-> AAAI Conference on Artificial Intelligence (AAAI), 2026
+> Proceedings of the AAAI Conference on Artificial Intelligence (AAAI), 2026
 <br/>
-
-## Todo
-
 
 
 ## Getting started <a name="gettingstarted"></a>
@@ -35,6 +32,12 @@
 - [Training and Evaluation](docs/train_eval.md)
 
 ## Model Checkpoints
+
+|Model|Resolution|Backbone | EPDMS | Checkpoint |
+|:-|:-:|:---:|:----:|:----:|
+|[DriveSuprim_R34](navsim/planning/script/config/common/agent/drivesuprim_agent_r34.yaml) | 512x2048 | ResNet34 | 83.1 | [link](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/model_ckpt/drivesuprim_r34.ckpt) |
+|[DriveSuprim_V2-99](navsim/planning/script/config/common/agent/drivesuprim_agent_vov.yaml) | 512x2048 | [V2-99](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/pretrained_backbones/dd3d_det_final.pth) | 86.0 | [link](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/model_ckpt/drivesuprim_vov.ckpt) |
+|[DriveSuprim_ViT-L](navsim/planning/script/config/common/agent/drivesuprim_agent_vit.yaml) | 256x1024 | [ViT-Large](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/pretrained_backbones/da_vitl16.pth) | 87.1 | [link](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/model_ckpt/drivesuprim_vit.ckpt) |
 
 
 ## License and citation <a name="licenseandcitation"></a>
@@ -59,11 +62,9 @@ All assets and code in this repository are under the [Apache 2.0 license](./LICE
 }
 ```
 
-<p align="right">(<a href="#top">back to top</a>)</p>
 
 ## Other resources <a name="otherresources"></a>
 
 - [SLEDGE](https://github.com/autonomousvision/sledge) | [tuPlan garage](https://github.com/autonomousvision/tuplan_garage) | [CARLA garage](https://github.com/autonomousvision/carla_garage) | [Survey on E2EAD](https://github.com/OpenDriveLab/End-to-end-Autonomous-Driving)
 - [PlanT](https://github.com/autonomousvision/plant) | [KING](https://github.com/autonomousvision/king) | [TransFuser](https://github.com/autonomousvision/transfuser) | [NEAT](https://github.com/autonomousvision/neat)
 
-<p align="right">(<a href="#top">back to top</a>)</p>

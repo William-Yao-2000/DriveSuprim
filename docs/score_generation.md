@@ -4,7 +4,7 @@ For each scenario in NAVSIM, we need to generate the rule-based metric score for
 
 For debugging, you can implement the steps on the `navtrain_debug` split.
 
-> Score Generation is time-consuming. You can also ignore the steps below and directly download our [generated score data](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/traj_pdm_v2/ori/vocab_score_8192_navtrain_final/navtrain.pkl).
+> Score Generation is time-consuming. You can also ignore the steps below and directly download our [generated score data](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/traj_pdm_v2/ori/vocab_score_8192_navtrain_final/navtrain.pkl).
 
 ### 1. Dataset Metric Caching
 

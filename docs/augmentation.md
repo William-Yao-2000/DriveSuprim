@@ -6,8 +6,8 @@ Specifically, we specify several rotation angles for each scenario, revise the e
 For debugging, you can implement the steps on the `navtrain_debug` split.
 
 > Augmentation Data Generation is time-consuming. You can also ignore the steps below and directly download our generated augmentation data:
-> - Offline augmentation file: [rot_30-p_0.5-ensemble.json](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/offline_files/training_ego_aug_files/rot_30-p_0.5-ensemble.json)
-> - Splited pickle files containing pdm score (stored in .tar): [vocab_score_8192_navtrain_final-rot_30-p_0.5-ensemble.tar](https://huggingface.co/alkaid-2000/DriveSuprim/blob/main/traj_pdm_v2/random_aug/vocab_score_8192_navtrain_final-rot_30-p_0.5-ensemble.tar)
+> - Offline augmentation file: [rot_30-p_0.5-ensemble.json](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/offline_files/training_ego_aug_files/rot_30-p_0.5-ensemble.json)
+> - Splited pickle files containing pdm score (stored in .tar): [vocab_score_8192_navtrain_final-rot_30-p_0.5-ensemble.tar](https://huggingface.co/alkaid-2000/DriveSuprim/resolve/main/traj_pdm_v2/random_aug/rot_30-p_0.5-ensemble.tar)
 
 
 
