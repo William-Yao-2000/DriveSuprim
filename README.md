@@ -13,7 +13,7 @@
 
 > [**DriveSuprim: Towards Precise Trajectory Selection for End-to-End Planning**](https://arxiv.org/abs/2506.06659)
 >
-> [Wenhao Yao](https://william-yao-2000.github.io/)<sup>1,2</sup>, [Zhenxin Li](https://woxihuanjiangguo.github.io/)<sup>1,2</sup>, [Shiyi Lan](https://voidrank.github.io/)<sup>3</sup>, [Zi Wang](https://scholar.google.com/citations?user=0SuL2yUAAAAJ&hl=en)<sup>3</sup>, [Xinglong Sun](https://www.xinglongsun.com/)<sup>3</sup>, [Jose M. Alvarez](https://alvarezlopezjosem.github.io/)<sup>3</sup>, [Zuxuan Wu](https://zxwu.azurewebsites.net/)<sup>1,2</sup>  <br>
+> [Wenhao Yao](https://william-yao-2000.github.io/)<sup>1,2</sup>, [Zhenxin Li](https://woxihuanjiangguo.github.io/)<sup>1,2</sup>, [Shiyi Lan](https://voidrank.github.io/)<sup>3</sup>, [Zi Wang](https://scholar.google.com/citations?user=0SuL2yUAAAAJ&hl=en)<sup>3</sup>, [Xinglong Sun](https://www.xinglongsun.com/)<sup>3</sup>, [Jose M. Alvarez](https://alvarezlopezjosem.github.io/)<sup>3</sup>, [Zuxuan Wu](https://zxwu.azurewebsites.net/)<sup>1,2*</sup>  <br>
 >
 > <sup>1</sup>Shanghai Key Lab of Intell. Info. Processing, School of CS, Fudan University \
 > <sup>2</sup>Shanghai Collaborative Innovation Center of Intelligent Visual Computing \
