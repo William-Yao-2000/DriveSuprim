@@ -1,28 +1,34 @@
 #!/bin/bash
 bash_file=$1
-num_refinement_stage=$2
-stage_layers=$3
-topks=$4
-partition=$5
+agent=$2
+num_refinement_stage=$3
+stage_layers=$4
+topks=$5
+partition=$6
+start_epoch=$7
 
-dir_name=$(echo $bash_file-$stage_layers-$topks | tr '/' '-' | tr '.' 'dot')
+dir_name=$(echo $bash_file-$agent-$stage_layers-$topks | tr '/' '-' | tr '.' 'dot')
 
-for epoch in $(seq 3 4 7)
+PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
+
+echo "start epoch: $epoch"
+
+for epoch in $(seq $start_epoch 4 7)
 do
-    echo $epoch
+    echo "current epoch: $epoch"
     submit_job \
         --gpu 8 \
-        --tasks_per_node 8 \
+        --tasks_per_node 1 \
         --nodes 1 \
         -n "$dir_name--$epoch" \
-        --image /lustre/fsw/portfolios/av/users/shiyil/yaowenh/container_images/ywh-navsim.sqsh \
-        --logroot /lustre/fsw/portfolios/av/users/shiyil/yaowenh/slurm_logs/navsim_v2/training \
+        --image $PREFIX_PATH/container_images/ywh-navsim.sqsh \
+        --logroot $PREFIX_PATH/slurm_logs/navsim_v2/training-$agent \
         --email_mode never \
         --duration 4 \
         --dependent_clones 0 \
         --partition $partition \
         --account av_research \
-        -c ". /lustre/fsw/portfolios/av/users/shiyil/yaowenh/pre-navsim_v2.sh; bash $bash_file $num_refinement_stage $stage_layers $topks $epoch"
+        -c ". $PREFIX_PATH/pre-navsim_v2.sh; bash $bash_file $agent $num_refinement_stage $stage_layers $topks $epoch"
 
     sleep 4.2h
 
@@ -31,8 +37,8 @@ done
 
 : '
 usage:
-bash scripts/slurm_bash/ssl/training/teacher_student/multi_stage/multi_stage-general-resume_4ep.sh \
-    scripts/ssl/training/teacher_student/rot_30-trans_0-va_0-p_0.5/multi_stage/multi_stage-general-resume.sh \
-    1 3 256 \
-    interactive
+bash scripts/slurm_bash/drivesuprim/training/teacher_student/multi_stage/multi_stage-general-resume_4ep.sh \
+    scripts/drivesuprim/training/rot_30-p_0.5/train-resume.sh \
+    drivesuprim_agent_vit 1 3 256 \
+    interactive 0
 '

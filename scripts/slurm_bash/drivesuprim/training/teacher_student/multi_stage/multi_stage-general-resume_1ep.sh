@@ -11,10 +11,11 @@ dir_name=$(echo $bash_file-$agent-$stage_layers-$topks | tr '/' '-' | tr '.' 'do
 
 PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
+echo "start epoch: $epoch"
 
 for epoch in $(seq $start_epoch 1 8)
 do
-    echo "start epoch: $epoch"
+    echo "current epoch: $epoch"
     submit_job \
         --gpu 8 \
         --tasks_per_node 1 \
@@ -23,7 +24,7 @@ do
         --image $PREFIX_PATH/container_images/ywh-navsim.sqsh \
         --logroot $PREFIX_PATH/slurm_logs/navsim_v2/training-$agent \
         --email_mode never \
-        --duration 3 \
+        --duration 3.3 \
         --dependent_clones 0 \
         --partition $partition \
         --account av_research \
