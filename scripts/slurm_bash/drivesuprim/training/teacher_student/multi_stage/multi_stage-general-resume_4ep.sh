@@ -11,7 +11,7 @@ dir_name=$(echo $bash_file-$agent-$stage_layers-$topks | tr '/' '-' | tr '.' 'do
 
 PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
-echo "start epoch: $epoch"
+echo "start epoch: $start_epoch"
 
 for epoch in $(seq $start_epoch 4 7)
 do

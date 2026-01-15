@@ -11,7 +11,7 @@ dir_name=$(echo $bash_file-$agent-$stage_layers-$topks | tr '/' '-' | tr '.' 'do
 
 PREFIX_PATH=/lustre/fsw/portfolios/av/projects/av_research/users/shiyil/yaowenh
 
-echo "start epoch: $epoch"
+echo "start epoch: $start_epoch"
 
 for epoch in $(seq $start_epoch 1 8)
 do
@@ -39,6 +39,6 @@ done
 usage:
 bash scripts/slurm_bash/drivesuprim/training/teacher_student/multi_stage/multi_stage-general-resume_1ep.sh \
     scripts/drivesuprim/training/rot_30-p_0.5/train-resume.sh \
-    drivesuprim_agent_r34 1 3 256 \
+    drivesuprim_agent_vov 1 3 256 \
     interactive 0
 '
