@@ -7,7 +7,7 @@ import timm
 from torch import nn
 
 from navsim.agents.backbones.eva import EVAViT
-from navsim.agents.backbones.internimage import InternImage
+# from navsim.agents.backbones.internimage import InternImage
 from navsim.agents.backbones.swin import SwinTransformerBEVFT
 from navsim.agents.backbones.vov import VoVNet
 from navsim.agents.drivesuprim.drivesuprim_config import DriveSuprimConfig
@@ -24,14 +24,14 @@ class DriveSuprimBackbonePE(nn.Module):
         super().__init__()
         self.config = config
         self.backbone_type = config.backbone_type
-        if config.backbone_type == 'intern':
-            self.image_encoder = InternImage(init_cfg=dict(type='Pretrained',
-                                                           checkpoint=config.intern_ckpt
-                                                           ),
-                                                           frozen_stages=2)
-            vit_channels = 2560
-            self.image_encoder.init_weights()
-        elif config.backbone_type == 'vov':
+        # if config.backbone_type == 'intern':
+        #     self.image_encoder = InternImage(init_cfg=dict(type='Pretrained',
+        #                                                    checkpoint=config.intern_ckpt
+        #                                                    ),
+        #                                                    frozen_stages=2)
+        #     vit_channels = 2560
+        #     self.image_encoder.init_weights()
+        if config.backbone_type == 'vov':
             self.image_encoder = VoVNet(
                 spec_name='V-99-eSE',
                 out_features=['stage4', 'stage5'],
