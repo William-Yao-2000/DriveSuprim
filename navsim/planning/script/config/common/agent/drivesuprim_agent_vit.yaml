@@ -35,7 +35,7 @@ config:
   vit_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/da_vitl16.pth
   intern_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/intern_object365.pth
   vov_ckpt: ${oc.env:NAVSIM_EXP_ROOT}/models/dd3d_det_final.pth
-  lr_mult_backbone: 1.0
+  lr_mult_backbone: 0.1
 
   n_camera: 3
 
