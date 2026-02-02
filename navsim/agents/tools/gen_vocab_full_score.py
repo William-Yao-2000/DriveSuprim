@@ -53,10 +53,6 @@ def main(cfg: DictConfig) -> None:
     print(f'Results will be written to {result_path}')
     dir = f'ori/vocab_score_{vocab_size}_{scene_filter_name}'
 
-    if cfg.debug:
-        os.environ['VOCAB_SCORING_DEBUG'] = 'true'
-        import pdb; pdb.set_trace()
-
     data_points = [
         {
             "cfg": cfg,
@@ -116,9 +112,7 @@ def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[D
 
     tokens_to_evaluate = list(set(scene_loader.tokens) & set(metric_cache_loader.tokens))
     pdm_results: List[Dict[str, Any]] = []
-
-    if os.getenv('VOCAB_SCORING_DEBUG') == 'true':
-        import pdb; pdb.set_trace()
+    
     for idx, (token) in enumerate(tokens_to_evaluate):
         logger.info(
             f"Processing scenario {idx + 1} / {len(tokens_to_evaluate)} in thread_id={thread_id}, node_id={node_id}"

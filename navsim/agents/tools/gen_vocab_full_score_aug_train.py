@@ -48,9 +48,6 @@ def main(cfg: DictConfig) -> None:
     dir_component = '-'.join(dir_component)
     dir = f'random_aug/{dir_component}/vocab_score_{vocab_size}_{scene_filter_name}'
     
-    if cfg.debug:
-        os.environ['VOCAB_SCORING_DEBUG'] = 'true'
-        import pdb; pdb.set_trace()
     build_logger(cfg)
     worker = build_worker(cfg)
     vocab = np.load(traj_path)
@@ -93,8 +90,6 @@ def main(cfg: DictConfig) -> None:
 
 
 def run_pdm_score(args: List[Dict[str, Union[List[str], DictConfig]]]) -> List[Dict[str, Any]]:
-    if os.getenv('VOCAB_SCORING_DEBUG') == 'true':
-        import pdb; pdb.set_trace()
 
     node_id = int(os.environ.get("NODE_RANK", 0))
     thread_id = str(uuid.uuid4())

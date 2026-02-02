@@ -44,11 +44,3 @@ echo $command_string
 echo -e "\n\n"
 
 torchrun --nproc_per_node=8 --master_port=29500 $command_string
-
-
-: '
-usage:
-bash scripts/drivesuprim/evaluation/eval_file.sh \
-    training/drivesuprim_agent_r34/rot_30-p_0.5/stage_layers_3-topks_256 drivesuprim_r34 \
-    1 3 256 drivesuprim_agent_r34 teacher
-'

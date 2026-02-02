@@ -102,7 +102,20 @@ bash scripts/drivesuprim/evaluation/eval_epoch.sh \
 
 #### 2.2 Evaluate on a specific checkpoint file
 
-You can download our model checkpoint from [here](https://huggingface.co/alkaid-2000/DriveSuprim/tree/main/model_ckpt). For more details, please refer to the [README](../README.md) file.
+You can download our model checkpoint from [here](https://huggingface.co/alkaid-2000/DriveSuprim/tree/main/model_ckpt), and then move to exp_v2 directory (shown below). For more details, please refer to the [README](../README.md) file.
+
+
+```angular2html
+~/drivesuprim_workspace
+├── DriveSuprim
+├── dataset
+└── exp_v2
+    └── model_ckpt
+         ├── drivesuprim_r34.ckpt
+         ├── drivesuprim_vit.ckpt
+         └── drivesuprim_vov.ckpt
+```
+
 
 ```bash
 # ResNet34

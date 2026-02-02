@@ -19,9 +19,6 @@ class DriveSuprimModel(nn.Module):
     def __init__(self, config: DriveSuprimConfig):
         super().__init__()
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
-
         self._config = config
         assert config.backbone_type in ['vit', 'intern', 'vov', 'resnet34', 'resnet50', 'eva', 'moe', 'moe_ult32', 'swin', 'sptr']
         if config.backbone_type == 'eva':
@@ -82,9 +79,6 @@ class DriveSuprimModel(nn.Module):
                 features: Dict[str, torch.Tensor],
                 masks=None,
                 tokens=None) -> Dict[str, torch.Tensor]:
-        
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
         
         output: Dict[str, torch.Tensor] = {}
 
@@ -182,9 +176,6 @@ class HydraTrajHead(nn.Module):
             )
         })
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
-
         self.normalize_vocab_pos = config.normalize_vocab_pos
         if self.normalize_vocab_pos:
             self.encoder = MemoryEffTransformer(
@@ -201,9 +192,6 @@ class HydraTrajHead(nn.Module):
         )
 
     def forward(self, img_feature, status_encoding, tokens=None) -> Dict[str, torch.Tensor]:
-
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         vocab = self.vocab.data  # [n_vocab, 40, 3]
         L, HORIZON, _ = vocab.shape
@@ -267,9 +255,6 @@ class RefineTrajHead(nn.Module):
                  config: DriveSuprimConfig = None
                  ):
         super().__init__()
-
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
         
         stage_layers = str(stage_layers)
         topks = str(topks)
@@ -366,9 +351,6 @@ class RefineTrajHead(nn.Module):
             )
 
     def forward(self, img_feat, refinement_dict) -> Dict[str, torch.Tensor]:
-
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         B = img_feat.shape[0]
         

@@ -45,8 +45,6 @@ def drivesuprim_agent_loss_first_stage(
     """
     Helper function calculating loss of DriveSuprim first stage (coarse filtering)
     """
-    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        import pdb; pdb.set_trace()
     
     bce_loss_fn = F.binary_cross_entropy_with_logits
 
@@ -129,9 +127,6 @@ def drivesuprim_agent_loss_single_refine_stage(
     """
     Helper function calculating loss of single refinement stage of DriveSuprim
     """
-
-    if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        import pdb; pdb.set_trace()
 
     bce_loss_fn = F.binary_cross_entropy_with_logits
 

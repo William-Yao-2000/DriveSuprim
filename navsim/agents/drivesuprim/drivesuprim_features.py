@@ -39,9 +39,6 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
         self._config = config
         self.training = config.training
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
-
         if self.training:
             with open(config.ego_perturb.offline_aug_file, 'r') as f:
                 aug_data = json.load(f)
@@ -85,9 +82,6 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
     def compute_features(self, agent_input: AgentInput, scene: Scene) -> Dict[str, torch.Tensor]:
         """Inherited, see superclass."""
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
-
         features = {}
         
         initial_token = scene.scene_metadata.initial_token
@@ -126,9 +120,6 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
         seq_len = self._config.seq_len
         cameras = agent_input.cameras[-seq_len:]  # List[Cameras]
         assert(len(cameras) == seq_len)
-
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
         
         # Teacher input
         res['ori_teacher'] = []
@@ -210,8 +201,6 @@ class DriveSuprimFeatureBuilder(AbstractFeatureBuilder):
 
 class DriveSuprimTargetBuilder(AbstractTargetBuilder):
     def __init__(self, config: DriveSuprimConfig):
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
         
         self._config = config
         self.v_params = get_pacifica_parameters()
@@ -230,8 +219,6 @@ class DriveSuprimTargetBuilder(AbstractTargetBuilder):
     def compute_targets(self, scene: Scene) -> Dict[str, torch.Tensor]:
         """Inherited, see superclass."""
 
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
         initial_token = scene.scene_metadata.initial_token
         future_traj = scene.get_future_trajectory(
             num_trajectory_frames=int(4 / 0.5)

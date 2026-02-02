@@ -128,8 +128,6 @@ class DriveSuprimBackbonePE(nn.Module):
         self.img_feat_c = vit_channels
 
     def forward(self, image, **kwargs):
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         if isinstance(self.image_encoder, DAViT):
             image_feat = self.image_encoder(image, **kwargs)[-1]

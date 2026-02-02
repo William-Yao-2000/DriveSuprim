@@ -2,7 +2,6 @@
 
 <p align="center">
   <h2 align="left">DriveSuprim: Towards Precise Trajectory Selection for End-to-End Planning</h1>
-  <h3 align="left"><a href="https://arxiv.org/abs/2506.06659">Paper Link</a>
 </p>
 
 </div>
@@ -21,6 +20,13 @@
 >
 > Proceedings of the AAAI Conference on Artificial Intelligence (AAAI), 2026
 <br/>
+
+## Architecture
+
+<p align="center">
+  <img src="assets/arch.png" alt="Architecture Diagram">
+</p>
+
 
 
 ## Getting started <a name="gettingstarted"></a>

@@ -55,8 +55,6 @@ class SSLMetaArch(nn.Module):
             loss.backward()
 
     def forward(self, teacher_ori_features, student_feat_dict_lst, **kwargs):
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         # teacher output
         @torch.no_grad()
@@ -76,16 +74,12 @@ class SSLMetaArch(nn.Module):
         if not self.cfg.training:
             return teacher_pred, []
         
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
-        
         student_preds = self.student.model.forward_features_list(student_feat_dict_lst)
 
         return teacher_pred, student_preds
 
     def update_teacher(self, m):
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
+
         with torch.no_grad():
             for k in self.student.keys():
                 for stu_params, tea_params in zip(self.student[k].parameters(), self.teacher[k].parameters()):

@@ -102,8 +102,6 @@ class DriveSuprimAgent(AbstractAgent):
         return [DriveSuprimFeatureBuilder(config=self._config)]
 
     def forward(self, batch) -> Dict[str, torch.Tensor]:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
         
         features, targets, tokens = batch
         kwargs = {'tokens': tokens}
@@ -142,8 +140,6 @@ class DriveSuprimAgent(AbstractAgent):
         """
         Compute the student loss using ground truth.
         """
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         # ori data
         ori_targets = { 'trajectory': targets['ori_trajectory'] }
@@ -193,9 +189,6 @@ class DriveSuprimAgent(AbstractAgent):
         Compute the student loss using teacher soft label.
         """
 
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
-
         sampled_timepoints = [5 * ii - 1 for ii in range(1, 9)]
         if self._config.soft_label_traj == 'first':
             traj_diff = teacher_pred['trajectory'][:, sampled_timepoints] - targets['ori_trajectory']
@@ -229,9 +222,6 @@ class DriveSuprimAgent(AbstractAgent):
         predictions: List[Dict[str, torch.Tensor]],
         tokens=None
     ) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
-        
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         _refinement_metrics = self.metrics
         trajectory_vocab = predictions[0]['trajectory_vocab']

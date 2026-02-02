@@ -103,8 +103,6 @@ class MetricCacheProcessorAugTrain:
                         (global) x,y,heading, length,width,height; (global coord) v;
                         tracktype, timestamp, instance token, track token
         """
-        if os.getenv('ROBUST_CACHING_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
         _rotation = self.aug_info[scenario.token]['rot']
         _rotation = _rotation / 360.0 * (2*np.pi)
         _vel = self.aug_info[scenario.token].get('vel', 0)
@@ -339,8 +337,6 @@ class MetricCacheProcessorAugTrain:
         # TODO: we should infer this from the scene metadata
         is_synthetic_scene = len(scenario.token) == 17
 
-        if os.getenv('ROBUST_CACHING_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
         _rotation = self.aug_info[scenario.token]['rot']
         _rotation = _rotation / 360.0 * (2*np.pi)
         _vel = self.aug_info[scenario.token].get('vel', 0)
