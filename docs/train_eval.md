@@ -60,6 +60,36 @@ bash scripts/drivesuprim/training/rot_30-p_0.5/train.sh \
   drivesuprim_agent_vit 1 3 256
 ```
 
+<details>
+<summary>Debug split training</summary>
+
+```bash
+CUDA_VISIBLE_DEVICES=0 HYDRA_FULL_ERROR=1 \
+python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
+    +debug=true \
+    agent=drivesuprim_agent_vit \
+    experiment_name=debug \
+    split=trainval \
+    train_test_split=navtrain_debug \
+    \~trainer.params.strategy \
+    trainer.params.limit_train_batches=0.08 \
+    trainer.params.limit_val_batches=0.50 \
+    dataloader.params.batch_size=1 \
+    dataloader.params.num_workers=0 \
+    dataloader.params.pin_memory=false \
+    dataloader.params.prefetch_factor=null \
+    agent.config.ego_perturb.n_student_rotation_ensemble=3 \
+    agent.config.ego_perturb.offline_aug_angle_boundary=30 \
+    agent.config.ego_perturb.offline_aug_file=$NAVSIM_EXP_ROOT/offline_files/training_ego_aug_files/rot_30-p_0.5-ensemble.json \
+    agent.config.refinement.use_multi_stage=true \
+    agent.config.refinement.num_refinement_stage=1 \
+    agent.config.refinement.stage_layers=3 \
+    agent.config.refinement.topks=256 \
+    agent.config.ori_vocab_pdm_score_full_path=$NAVSIM_TRAJPDM_ROOT/ori/vocab_score_8192_navtrain_debug/navtrain_debug.pkl \
+    agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-p_0.5-ensemble_debug/vocab_score_8192_navtrain_final/split_pickles \
+    cache_path=null
+```
+
 
 ## Evaluation
 

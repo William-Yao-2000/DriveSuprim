@@ -45,8 +45,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
         :return: scalar loss
         """
         features, targets, tokens = batch
-        # if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-        #     import pdb; pdb.set_trace()
 
         teacher_pred, student_preds = self.agent.forward(batch)
 
@@ -112,8 +110,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
         optimizer,
         optimizer_closure = None,
     ) -> None:
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         optimizer.step(closure=optimizer_closure)
 
@@ -182,9 +178,6 @@ class AgentLightningModuleSSL(pl.LightningModule):
             interval_length = 0.1
         else:
             interval_length = 0.5
-        
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
 
         result = {}

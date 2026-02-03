@@ -99,7 +99,9 @@ Finally, install navsim.
 To this end, create a new environment and install the required dependencies:
 
 ```bash
-conda env create --name drivesuprim -f environment.yml
+conda create -n drivesuprim python=3.9
 conda activate drivesuprim
+pip install -r requirements.txt
+python -m mim install mmcv-full==1.7.2 mmdet==2.28.2 mmengine
 pip install -e .
 ```

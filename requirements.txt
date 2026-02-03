@@ -39,6 +39,7 @@ tornado  # Used in nuboard.py
 tqdm  # Used widely
 ujson  # Used in serialiation_callback.py
 
+torch==2.0.1
 xformers
 pytorch-lightning==2.2.1
 tensorboard==2.16.2
@@ -49,3 +50,4 @@ timm
 einops
 imgaug
 fvcore
+openmim

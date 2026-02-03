@@ -50,8 +50,6 @@ class AgentLightningModule(pl.LightningModule):
         :param logging_prefix: prefix where to log step
         :return: scalar loss
         """
-        if os.getenv('ROBUST_HYDRA_DEBUG') == 'true':
-            import pdb; pdb.set_trace()
 
         features, targets, tokens = batch
 

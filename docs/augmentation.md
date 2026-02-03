@@ -18,10 +18,15 @@ We ensemble multiple augmentation files to form larger augmented dataset, which 
 
 #### 1.1 Generate augmentation file
 
-You can change the **rotation boundary**, **augmentation percentage**, and **random seed** to generate different augmentation files.
+You can change the **rotation boundary**, **augmentation percentage**, and **random seed** to generate different augmentation files. \
+(Here you should change the random seed from **2024** to **2026**.)
 
 ```bash
 python navsim/agents/tools/gen_offline_training_aug_file.py --rot=30 --percentage=0.5 --seed=2024
+
+python navsim/agents/tools/gen_offline_training_aug_file.py --rot=30 --percentage=0.5 --seed=2025
+
+python navsim/agents/tools/gen_offline_training_aug_file.py --rot=30 --percentage=0.5 --seed=2026
 ```
 
 #### 1.2 Offline file ensemble
@@ -35,7 +40,9 @@ python navsim/agents/tools/gen_offline_training_aug_file_ensemble_seed.py --rot=
 
 ### 2. Augmented Dataset Metric Cache
 
-Please make sure that the rotation angle, percentage, and random seed in **offline_aug_file** is the same as the one in **metric_cache_path**.
+Please make sure that the rotation angle, percentage, and random seed in **offline_aug_file** is the same as the one in **metric_cache_path**. \
+(Here you should do the metric cache for the above 3 augmentation files.)
+
 
 ```bash
 python navsim/planning/script/run_metric_caching_aug_train.py train_test_split=navtrain \
@@ -67,10 +74,16 @@ This process can be time consuming. You can split the `navtrain` set into multip
 
 ```bash
 bash scripts/drivesuprim/gen_full_score_aug/gen_training_full_score_aug.sh 30 0.5 2024
+
+bash scripts/drivesuprim/gen_full_score_aug/gen_training_full_score_aug.sh 30 0.5 2025
+
+bash scripts/drivesuprim/gen_full_score_aug/gen_training_full_score_aug.sh 30 0.5 2026
 ```
 
 <details>
 <summary>Debug split</summary>
+
+(please change the _seed from 2024 to 2026)
 
 ```bash
 export PROGRESS_MODE=gen_gt; \
