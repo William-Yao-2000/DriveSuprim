@@ -89,6 +89,7 @@ python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_training_ssl.py \
     agent.config.aug_vocab_pdm_score_dir=$NAVSIM_TRAJPDM_ROOT/random_aug/rot_30-p_0.5-ensemble_debug/vocab_score_8192_navtrain_final/split_pickles \
     cache_path=null
 ```
+</details>
 
 
 ## Evaluation
